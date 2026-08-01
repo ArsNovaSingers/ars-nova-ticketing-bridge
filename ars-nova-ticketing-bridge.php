@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.7.0' );
+define( 'ANS_TB_VERSION', '1.5.0' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -767,11 +767,14 @@ function ans_sp_styles() {
     }
     $done = true;
     return '<style id="ans-season-projects">
-.ans-sp{--ans-navy:#0e1b3a;--ans-gold:#c7a24a;--ans-cream:#f5f1e8;max-width:940px;margin:0 auto}
-.ans-sp__item{display:flex;gap:34px;align-items:flex-start;padding:38px 0;border-bottom:1px solid rgba(14,27,58,.14)}
+.ans-sp{--ans-navy:#0e1b3a;--ans-gold:#c7a24a;--ans-cream:#f5f1e8;max-width:1080px;margin:0 auto}
+.ans-sp__item{display:flex;gap:48px;align-items:center;padding:52px 0;border-bottom:1px solid rgba(14,27,58,.14)}
+.ans-sp__item:nth-child(even){flex-direction:row-reverse}
 .ans-sp__item:last-child{border-bottom:0}
-.ans-sp__thumb{flex:0 0 220px}
-.ans-sp__thumb img{width:100%;height:150px;object-fit:cover;border-radius:8px;display:block}
+.ans-sp__thumb{flex:0 0 380px}
+.ans-sp__thumb img{width:100%;height:260px;object-fit:cover;border-radius:10px;display:block}
+.ans-sp__thumb--placeholder{height:260px;border-radius:10px;background:linear-gradient(135deg,#0e1b3a 0%,#16423e 55%,#0e1b3a 100%);position:relative;overflow:hidden}
+.ans-sp__thumb--placeholder::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 42%,rgba(199,162,74,.30) 50%,transparent 58%)}
 .ans-sp__body{flex:1 1 auto;min-width:0}
 .ans-sp__when{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#9a7b2e;margin:0 0 8px}
 .ans-sp__name{font-size:34px;font-weight:700;line-height:1.15;margin:0 0 10px}
@@ -784,7 +787,7 @@ function ans_sp_styles() {
 .ans-sp__cta{display:inline-block;background:var(--ans-navy);color:#fff;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 32px;border-radius:40px}
 .ans-sp__cta:hover{background:var(--ans-gold);color:var(--ans-navy)}
 .ans-sp__empty{font-size:17px;color:#3a4560;font-style:italic}
-@media (max-width:781px){.ans-sp__item{flex-direction:column;gap:18px}.ans-sp__thumb{flex:1 1 auto;width:100%}.ans-sp__name{font-size:27px}}
+@media (max-width:781px){.ans-sp__item,.ans-sp__item:nth-child(even){flex-direction:column;gap:18px}.ans-sp__thumb{flex:1 1 auto;width:100%}.ans-sp__thumb img{height:210px}.ans-sp__thumb--placeholder{height:180px}.ans-sp__name{font-size:27px}}
 </style>';
 }
 
@@ -919,6 +922,11 @@ function ans_sp_render( $atts ) {
 
         if ( $page_id && has_post_thumbnail( $page_id ) ) {
             $out .= '<div class="ans-sp__thumb">' . get_the_post_thumbnail( $page_id, 'medium_large' ) . '</div>';
+        } else {
+            // No artwork yet. Emit a season-palette placeholder rather than
+            // nothing, so the row keeps its two-column rhythm and the
+            // alternating left/right cadence does not break mid-list.
+            $out .= '<div class="ans-sp__thumb ans-sp__thumb--placeholder" aria-hidden="true"></div>';
         }
 
         $out .= '<div class="ans-sp__body">';
