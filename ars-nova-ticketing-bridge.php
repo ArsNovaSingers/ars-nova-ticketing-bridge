@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.8.2
+ * Version: 1.8.3
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.8.2' );
+define( 'ANS_TB_VERSION', '1.8.3' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -2010,3 +2010,6 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/season-packages.php';
 
 /* v1.8.2 - bulk post meta (see includes/). */
 require_once plugin_dir_path( __FILE__ ) . 'includes/bulk-meta.php';
+
+/* v1.8.3 - collapse checkout attendee fields (see includes/). */
+require_once plugin_dir_path( __FILE__ ) . 'includes/checkout-attendees.php';
