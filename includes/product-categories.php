@@ -27,14 +27,16 @@ if ( ! defined( 'ABSPATH' ) ) {
  * by WooCommerce product category, and Tickera event categories are a
  * completely separate taxonomy (Tickera_Wiki_01 trap #8).
  *
- * Routes are under /wc/ rather than /tickera/ because product_cat is
- * WooCommerce's taxonomy, not Tickera's.
+ * Routes are top-level (not under /tickera/) because product_cat is WooCommerce's
+ * taxonomy, not Tickera's. They are deliberately NOT prefixed /wc/ - ans_rest_call
+ * rejects any route starting "wc/" as a foreign namespace, so a /wc/ prefix makes
+ * these endpoints unreachable by the very tool meant to call them.
  * ========================================================================== */
 
 add_action( 'rest_api_init', 'ans_tb_register_v170_routes' );
 
 function ans_tb_register_v170_routes() {
-    register_rest_route( ANS_TB_NS, '/wc/product-categories', array(
+    register_rest_route( ANS_TB_NS, '/product-categories', array(
         array(
             'methods'             => 'GET',
             'callback'            => 'ans_tb_list_product_categories',
@@ -46,7 +48,7 @@ function ans_tb_register_v170_routes() {
             'permission_callback' => 'ans_tb_perm',
         ),
     ) );
-    register_rest_route( ANS_TB_NS, '/wc/product-category/(?P<id>\d+)', array(
+    register_rest_route( ANS_TB_NS, '/product-category/(?P<id>\d+)', array(
         array(
             'methods'             => 'POST, PUT, PATCH',
             'callback'            => 'ans_tb_update_product_category',
@@ -58,7 +60,7 @@ function ans_tb_register_v170_routes() {
             'permission_callback' => 'ans_tb_perm',
         ),
     ) );
-    register_rest_route( ANS_TB_NS, '/wc/assign-product-categories', array(
+    register_rest_route( ANS_TB_NS, '/assign-product-categories', array(
         'methods'             => 'POST',
         'callback'            => 'ans_tb_assign_product_categories',
         'permission_callback' => 'ans_tb_perm',
@@ -146,7 +148,7 @@ function ans_tb_pc_to_list( $value ) {
     return array();
 }
 
-/** GET /wc/product-categories */
+/** GET /product-categories */
 function ans_tb_list_product_categories( $req ) {
     $guard = ans_tb_pc_guard();
     if ( is_wp_error( $guard ) ) {
@@ -167,7 +169,7 @@ function ans_tb_list_product_categories( $req ) {
     return array( 'count' => count( $out ), 'categories' => $out );
 }
 
-/** POST /wc/product-categories — body: { name, slug?, parent?, description? } */
+/** POST /product-categories — body: { name, slug?, parent?, description? } */
 function ans_tb_create_product_category( $req ) {
     $guard = ans_tb_pc_guard();
     if ( is_wp_error( $guard ) ) {
@@ -203,7 +205,7 @@ function ans_tb_create_product_category( $req ) {
     return $payload;
 }
 
-/** POST /wc/product-category/{id} */
+/** POST /product-category/{id} */
 function ans_tb_update_product_category( $req ) {
     $guard = ans_tb_pc_guard();
     if ( is_wp_error( $guard ) ) {
@@ -238,7 +240,7 @@ function ans_tb_update_product_category( $req ) {
     return ans_tb_pc_payload( $id );
 }
 
-/** DELETE /wc/product-category/{id} */
+/** DELETE /product-category/{id} */
 function ans_tb_delete_product_category( $req ) {
     $guard = ans_tb_pc_guard();
     if ( is_wp_error( $guard ) ) {
@@ -258,7 +260,7 @@ function ans_tb_delete_product_category( $req ) {
 }
 
 /**
- * POST /wc/assign-product-categories
+ * POST /assign-product-categories
  *
  * Body: {
  *   dry_run?:     bool    default TRUE — must pass false explicitly to write
