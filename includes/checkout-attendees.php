@@ -67,6 +67,7 @@ function ans_tb_attendee_accordion() {
     var CLOSED = 'Send this ticket to someone else';
     var OPEN   = 'Send this ticket to me instead';
     var HINT   = 'Leave this closed and the ticket comes to you. Open it to email this one straight to someone else.';
+    var seq    = 0;
 
     function decorate(){
         var wraps = document.querySelectorAll('.wp-block-checkout-owner-fields');
@@ -80,13 +81,20 @@ function ans_tb_attendee_accordion() {
                 var group = h5.parentElement;
                 if (!group) return;
 
-                // Already decorated and still intact? leave it alone.
-                if (group.getAttribute('data-ans-att') === '1' &&
-                    group.previousElementSibling &&
-                    group.previousElementSibling.classList.contains('ans-att-toggle')) {
+                // Idempotency. Give the group a stable id and look for the
+                // toggle that belongs to IT. An earlier version checked
+                // previousElementSibling, but we insert two nodes (button and
+                // hint), so the sibling was always the hint and the guard never
+                // matched — every re-render appended another button.
+                var gid = group.getAttribute('data-ans-att');
+                if (!gid) {
+                    gid = 'ans-att-' + (++seq);
+                    group.setAttribute('data-ans-att', gid);
+                }
+                if (group.parentNode &&
+                    group.parentNode.querySelector('.ans-att-toggle[data-for="' + gid + '"]')) {
                     return;
                 }
-                group.setAttribute('data-ans-att', '1');
 
                 // If the patron already typed something, keep it visible.
                 var filled = false;
@@ -97,6 +105,7 @@ function ans_tb_attendee_accordion() {
                 var btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'ans-att-toggle';
+                btn.setAttribute('data-for', gid);
                 btn.setAttribute('aria-expanded', filled ? 'true' : 'false');
                 btn.innerHTML = '<span class="ans-att-toggle__sign">' + (filled ? '−' : '+') + '</span>' +
                                 '<span class="ans-att-toggle__text">' + (filled ? OPEN : CLOSED) + '</span>';
