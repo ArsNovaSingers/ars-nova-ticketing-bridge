@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.8.0
+ * Version: 1.8.1
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.8.0' );
+define( 'ANS_TB_VERSION', '1.8.1' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -1391,9 +1391,23 @@ function ans_tb_assign_template( $req ) {
         return new WP_Error( 'no_template', 'No template_id given and no ticket template exists on this site.', array( 'status' => 400 ) );
     }
 
-    $meta = array( 'relation' => 'AND', array( 'key' => '_ticket', 'value' => 'yes' ) );
+    // v1.8.1: match BOTH meta conventions. repair-tickets deletes the legacy
+    // `_ticket` / `event_name` keys, so searching only those found nothing on
+    // any repaired product — half of why this route was marked broken.
+    $meta = array(
+        'relation' => 'AND',
+        array(
+            'relation' => 'OR',
+            array( 'key' => '_tc_is_ticket', 'value' => 'yes' ),
+            array( 'key' => '_ticket', 'value' => 'yes' ),
+        ),
+    );
     if ( ! empty( $p['event_id'] ) ) {
-        $meta[] = array( 'key' => 'event_name', 'value' => (int) $p['event_id'] );
+        $meta[] = array(
+            'relation' => 'OR',
+            array( 'key' => '_event_name', 'value' => (int) $p['event_id'] ),
+            array( 'key' => 'event_name', 'value' => (int) $p['event_id'] ),
+        );
     }
     $args = array(
         'post_type'   => 'product',
@@ -1407,7 +1421,13 @@ function ans_tb_assign_template( $req ) {
 
     $updated = array();
     foreach ( get_posts( $args ) as $po ) {
-        update_post_meta( $po->ID, 'ticket_template', $template_id );
+        // v1.8.1: write the key the Ticket DESIGNER actually reads. This route
+        // previously wrote `ticket_template`, which repair-tickets deletes as
+        // stale — so assignment silently did nothing and tickets printed blank.
+        update_post_meta( $po->ID, 'tc_designer_template_id', $template_id );
+        if ( isset( $p['legacy_template'] ) ) {
+            update_post_meta( $po->ID, '_ticket_template', (int) $p['legacy_template'] );
+        }
         $updated[] = array( 'id' => $po->ID, 'name' => $po->post_title );
     }
     return array( 'template_id' => $template_id, 'count' => count( $updated ), 'updated' => $updated );
