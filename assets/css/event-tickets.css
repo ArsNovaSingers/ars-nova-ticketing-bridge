@@ -1,0 +1,299 @@
+/**
+ * Event Tickets — styles.
+ *
+ * Palette (confirmed 2026-08-07): navy #0e1b3a, gold #c7a24a / #d8b25e,
+ * cream #f5f1e8, river teal #16423e. Gold is a TEXT/ACCENT colour only and is
+ * never used as a background fill here — section fills are white and navy.
+ *
+ * Designed to sit inside the navy #tickets band on a project page, so the
+ * default text colour is light. Breakpoints match the site's real edges:
+ * 1025px (header swap) and 719px (Kadence mobile).
+ */
+
+.ans-et {
+	--ans-et-navy: #0e1b3a;
+	--ans-et-gold: #c7a24a;
+	--ans-et-cream: #f5f1e8;
+	max-width: 780px;
+	margin: 0 auto;
+	color: #fff;
+}
+
+.ans-et__heading {
+	margin: 0 0 28px;
+	font-size: 44px;
+	font-weight: 700;
+	text-align: center;
+	color: inherit;
+}
+
+/* --- Date boxes ---------------------------------------------------------- */
+
+.ans-et__dates {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 14px;
+}
+
+.ans-et__date {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding: 20px 16px;
+	border: 2px solid rgba(255, 255, 255, 0.28);
+	border-radius: 10px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+}
+
+.ans-et__date:hover:not(:disabled) {
+	border-color: var(--ans-et-gold);
+	background-color: rgba(255, 255, 255, 0.06);
+}
+
+.ans-et__date:focus-visible {
+	outline: 3px solid var(--ans-et-gold);
+	outline-offset: 2px;
+}
+
+/* Selected state is border + fill, never colour alone — colour alone fails
+   for anyone who cannot distinguish it. */
+.ans-et__date.is-on {
+	border-color: var(--ans-et-gold);
+	background-color: rgba(199, 162, 74, 0.16);
+}
+
+.ans-et__date.is-unavailable {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.ans-et__date-day {
+	font-size: 12px;
+	letter-spacing: 2px;
+	text-transform: uppercase;
+	color: var(--ans-et-gold);
+}
+
+.ans-et__date-date {
+	font-size: 24px;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.ans-et__date-time {
+	font-size: 15px;
+}
+
+.ans-et__date-venue {
+	font-size: 13px;
+	opacity: 0.85;
+}
+
+.ans-et__date-flag {
+	margin-top: 6px;
+	font-size: 12px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: var(--ans-et-gold);
+}
+
+/* --- Options panel ------------------------------------------------------- */
+
+.ans-et__panel {
+	margin-top: 26px;
+	padding: 24px;
+	border: 1px solid rgba(255, 255, 255, 0.22);
+	border-radius: 10px;
+	background-color: rgba(255, 255, 255, 0.05);
+}
+
+.ans-et__panel[hidden] {
+	display: none;
+}
+
+.ans-et__panel-for {
+	margin: 0 0 18px;
+	font-size: 14px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	color: var(--ans-et-gold);
+}
+
+.ans-et__row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: 14px 0;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.ans-et__row:last-child {
+	border-bottom: 0;
+}
+
+.ans-et__row-label {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.ans-et__row-tier {
+	font-size: 17px;
+	font-weight: 600;
+}
+
+.ans-et__row-price {
+	font-size: 14px;
+	opacity: 0.85;
+}
+
+.ans-et__row.is-on .ans-et__row-tier {
+	color: var(--ans-et-gold);
+}
+
+/* --- Stepper ------------------------------------------------------------- */
+
+.ans-et__stepper {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.ans-et__step {
+	width: 38px;
+	height: 38px;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	border-radius: 6px;
+	background: transparent;
+	color: #fff;
+	font-size: 19px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.ans-et__step:hover {
+	border-color: var(--ans-et-gold);
+	color: var(--ans-et-gold);
+}
+
+.ans-et__step:focus-visible {
+	outline: 3px solid var(--ans-et-gold);
+	outline-offset: 2px;
+}
+
+.ans-et__qty {
+	min-width: 34px;
+	font-size: 17px;
+	font-weight: 700;
+	text-align: center;
+}
+
+/* --- Bar + single add-to-cart -------------------------------------------- */
+
+.ans-et__bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-top: 22px;
+	padding-top: 20px;
+	border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.ans-et__total {
+	margin: 0;
+	font-size: 16px;
+}
+
+.ans-et__go {
+	padding: 15px 38px;
+	border: 0;
+	border-radius: 40px;
+	background-color: var(--ans-et-gold);
+	color: var(--ans-et-navy);
+	font-size: 15px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.ans-et__go:hover:not(:disabled) {
+	background-color: #fff;
+}
+
+.ans-et__go:disabled {
+	opacity: 0.42;
+	cursor: not-allowed;
+}
+
+.ans-et__go:focus-visible {
+	outline: 3px solid #fff;
+	outline-offset: 3px;
+}
+
+.ans-et__err {
+	margin: 16px 0 0;
+	padding: 12px 14px;
+	border-radius: 6px;
+	background-color: rgba(180, 40, 40, 0.9);
+	color: #fff;
+	font-size: 15px;
+}
+
+.ans-et__err[hidden] {
+	display: none;
+}
+
+.ans-et--empty p {
+	margin: 0;
+	text-align: center;
+	opacity: 0.85;
+}
+
+/* --- Responsive ---------------------------------------------------------- */
+
+@media (max-width: 1024px) {
+	.ans-et__heading {
+		font-size: 34px;
+	}
+}
+
+@media (max-width: 719px) {
+	.ans-et__heading {
+		font-size: 27px;
+		margin-bottom: 20px;
+	}
+
+	.ans-et__dates {
+		grid-template-columns: 1fr;
+		gap: 10px;
+	}
+
+	.ans-et__date {
+		padding: 16px 14px;
+	}
+
+	.ans-et__panel {
+		padding: 18px 16px;
+	}
+
+	/* Stack the bar so the button is full width and thumb-reachable. */
+	.ans-et__bar {
+		flex-direction: column;
+		align-items: stretch;
+		text-align: center;
+	}
+
+	.ans-et__go {
+		width: 100%;
+		padding: 16px 20px;
+	}
+}
