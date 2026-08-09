@@ -323,7 +323,7 @@ add_shortcode( 'ans_event_tickets', 'ans_et_render' );
 add_action(
 	'wp_enqueue_scripts',
 	function () {
-		$base = plugin_dir_url( dirname( __FILE__ ) . '/ars-nova-ticketing-bridge.php' );
+		$base = plugin_dir_url( dirname( __FILE__ ) );
 
 		wp_register_style( 'ans-event-tickets', $base . 'assets/css/event-tickets.css', array(), ANS_TB_VERSION );
 		wp_register_script( 'ans-event-tickets', $base . 'assets/js/event-tickets.js', array(), ANS_TB_VERSION, true );
@@ -355,7 +355,7 @@ add_action(
 			return;
 		}
 
-		$base = plugin_dir_url( dirname( __FILE__ ) . '/ars-nova-ticketing-bridge.php' );
+		$base = plugin_dir_url( dirname( __FILE__ ) );
 
 		wp_register_script(
 			'ans-event-tickets-editor',
