@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.8.2
+ * Version: 1.8.2.1
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.8.2' );
+define( 'ANS_TB_VERSION', '1.8.2.1' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -783,8 +783,8 @@ function ans_sp_styles() {
 .ans-sp__blurb{font-size:17px;line-height:1.65;margin:0 0 18px;color:#25304a}
 .ans-sp__note{display:inline-block;font-size:12px;letter-spacing:1px;text-transform:uppercase;background:rgba(199,162,74,.22);color:#6d551a;padding:4px 10px;border-radius:20px;margin:0 8px 12px 0}
 .ans-sp__note--draft{background:rgba(122,31,43,.14);color:#7a1f2b}
-.ans-sp__cta{display:inline-block;background:var(--ans-navy);color:#fff;text-decoration:none;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 32px;border-radius:40px}
-.ans-sp__cta:hover{background:var(--ans-gold);color:var(--ans-navy)}
+.ans-sp__cta{display:inline-block;background:var(--ans-gold);color:var(--ans-navy);text-decoration:none;font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:13px 32px;border-radius:40px}
+.ans-sp__cta:hover{background:var(--ans-navy);color:#fff}
 .ans-sp__empty{font-size:17px;color:#3a4560;font-style:italic}
 @media (max-width:781px){.ans-sp__item,.ans-sp__item:nth-child(even){flex-direction:column;gap:18px}.ans-sp__thumb{flex:1 1 auto;width:100%}.ans-sp__thumb img{height:210px}.ans-sp__thumb--placeholder{height:180px}.ans-sp__name{font-size:27px}}
 </style>';
