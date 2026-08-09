@@ -179,7 +179,7 @@ function ans_et_tickets_for_event( $event_id ) {
 			'tier'    => $tier,
 			'label'   => isset( $tiers[ $tier ] ) ? $tiers[ $tier ]['label'] : $product->get_name(),
 			'price'   => $price,
-			'price_h' => $price > 0 ? wp_strip_all_tags( wc_price( $price ) ) : 'Free',
+			'price_h' => $price > 0 ? html_entity_decode( wp_strip_all_tags( wc_price( $price ) ), ENT_QUOTES, 'UTF-8' ) : 'Free',
 			'order'   => isset( $tiers[ $tier ] ) ? $tiers[ $tier ]['order'] : 99,
 		);
 	}
