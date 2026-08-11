@@ -211,7 +211,7 @@ function ans_pkg_render( $atts ) {
 
     $tiers = ans_pkg_tiers();
 
-    // Confluence Circle needs its membership product to exist; hide the tier otherwise.
+    // Nova Circle needs its membership product to exist; hide the tier otherwise.
     foreach ( $tiers as $k => $t ) {
         if ( empty( $t['extra_sku'] ) ) {
             continue;
