@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.9.2
+ * Version: 1.9.3
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.9.2' );
+define( 'ANS_TB_VERSION', '1.9.3' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -439,7 +439,33 @@ function ans_tb_update_event( $req ) {
         update_post_meta( $id, 'ans_hide', $p['ans_hide'] ? 1 : 0 );
     }
 
-    return ans_tb_event_payload( $id );
+    $payload = ans_tb_event_payload( $id );
+
+    /*
+     * Report submitted keys this endpoint does not consume.
+     *
+     * Without this the handler returns HTTP 200 and a full, healthy-looking payload
+     * after writing nothing — a caller cannot distinguish "applied" from "silently
+     * dropped" except by diffing the response by eye. That cost a real session on
+     * 2026-08-11: the write was sent as 'event_date_time' (the key the READ payload
+     * returns) rather than 'date' (the key this endpoint accepts), and the resulting
+     * 200 was read as success. The read/write asymmetry is the trap; the silence is
+     * what made it expensive.
+     */
+    $known = array(
+        'id', 'title', 'description', 'status', 'date', 'end_date', 'location',
+        'ans_display_title', 'ans_note', 'ans_page_id', 'ans_hide',
+    );
+    $ignored = array_values( array_diff( array_keys( $p ), $known ) );
+    if ( $ignored ) {
+        $payload['ignored_fields'] = $ignored;
+        $payload['warning']        = 'Not written — this endpoint does not accept: '
+            . implode( ', ', $ignored )
+            . '. Note the read/write asymmetry: the payload returns event_date_time and'
+            . ' event_location, but writes take date and location.';
+    }
+
+    return $payload;
 }
 
 /** DELETE /tickera/event/{id} — trash (default) or permanently delete with force=1. */

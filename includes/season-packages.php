@@ -64,7 +64,7 @@ function ans_pkg_tiers() {
         ),
         'circle' => array(
             'key'    => 'circle',
-            'name'   => 'Confluence Circle',
+            'name'   => 'Nova Circle',
             'pick'   => 5,
             'price'  => 300,
             'per'    => 0,
