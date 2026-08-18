@@ -24,14 +24,19 @@
  *
  * DETAIL MODAL — added 1.10.0.
  * Each tier card carries a "What's included" button that opens a modal
- * describing the tier. Three things about it are deliberate:
+ * describing the tier. Four things about it are deliberate:
  *   1. The panels are rendered SERVER-SIDE and hidden, not built from the JSON
  *      payload. The copy is therefore in the page for search engines and for
  *      anyone whose JS fails, and nothing is injected as unescaped HTML.
  *   2. The button is a real <button> inside the card, and the card's own click
  *      handler ignores clicks that came from it. Without that guard, asking
  *      "what is this?" would silently select the tier and scroll you to Step 2.
- *   3. The copy lives on ans_pkg_tiers() beside the price it describes, and
+ *   3. The tier card is a flex column and the button is pushed to the bottom
+ *      with margin-top:auto, over a blurb with a three-line min-height. Both
+ *      are needed: the min-height keeps the buttons on one baseline even when
+ *      one blurb wraps to a third line, which is what put the Nova Circle
+ *      button lower than the other two on 2026-08-18.
+ *   4. The copy lives on ans_pkg_tiers() beside the price it describes, and
  *      that array is filtered — so a future release can source the dated perks
  *      from the events themselves rather than from this file.
  *
@@ -301,15 +306,15 @@ function ans_pkg_styles() {
     $done = true;
     return '<style id="ans-season-packages">
 .ans-pkg{--ans-navy:#0e1b3a;--ans-gold:#c7a24a;--ans-gold-deep:#8a6d24;--ans-cream:#f5f1e8;max-width:1080px;margin:0 auto}
-.ans-pkg__tiers{display:flex;gap:20px;flex-wrap:wrap;margin:0 0 40px}
-.ans-pkg__tier{flex:1 1 260px;border:2px solid rgba(14,27,58,.16);border-radius:14px;padding:26px 24px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}
+.ans-pkg__tiers{display:flex;align-items:stretch;gap:20px;flex-wrap:wrap;margin:0 0 40px}
+.ans-pkg__tier{flex:1 1 260px;display:flex;flex-direction:column;border:2px solid rgba(14,27,58,.16);border-radius:14px;padding:26px 24px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}
 .ans-pkg__tier:hover{border-color:var(--ans-gold)}
 .ans-pkg__tier.is-on{border-color:var(--ans-navy);box-shadow:0 6px 26px rgba(14,27,58,.13)}
 .ans-pkg__tier h3{font-size:23px;margin:0 0 6px;color:var(--ans-navy)}
 .ans-pkg__price{font-size:34px;font-weight:700;color:var(--ans-navy);margin:0 0 2px}
 .ans-pkg__per{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:#8a6d24;margin:0 0 12px}
-.ans-pkg__blurb{font-size:15px;line-height:1.6;color:#3a4560;margin:0}
-.ans-pkg__more{display:inline-flex;align-items:center;gap:6px;margin:14px 0 0;padding:0;border:0;background:none;font:inherit;font-size:13.5px;font-weight:600;letter-spacing:.4px;color:#8a6d24;cursor:pointer;border-bottom:1px solid rgba(199,162,74,.55);line-height:1.9}
+.ans-pkg__blurb{font-size:15px;line-height:1.6;color:#3a4560;margin:0;min-height:4.8em}
+.ans-pkg__more{display:inline-flex;align-items:center;gap:6px;margin:14px 0 0;margin-top:auto;align-self:flex-start;padding:0;border:0;background:none;font:inherit;font-size:13.5px;font-weight:600;letter-spacing:.4px;color:#8a6d24;cursor:pointer;border-bottom:1px solid rgba(199,162,74,.55);line-height:1.9}
 .ans-pkg__more:hover,.ans-pkg__more:focus-visible{color:var(--ans-navy);border-bottom-color:var(--ans-navy)}
 .ans-pkg__more svg{width:13px;height:13px;flex:0 0 auto}
 .ans-pkg__more:focus-visible,.ans-pkg__tier:focus-visible{outline:3px solid var(--ans-gold);outline-offset:3px}
