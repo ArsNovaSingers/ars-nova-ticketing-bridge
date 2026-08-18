@@ -206,15 +206,23 @@ function ans_et_performances( $event_ids ) {
 	foreach ( $event_ids as $event_id ) {
 		$tickets = ans_et_tickets_for_event( $event_id );
 
-		$raw_date = get_post_meta( $event_id, 'event_date_time', true );
-		$stamp    = $raw_date ? strtotime( $raw_date ) : 0;
+		// This block used to read correctly for the wrong reason: a bare
+		// strtotime() parsed the site-local string as UTC, and date_i18n()
+		// then formatted that timestamp without re-applying the offset, so
+		// the two errors cancelled and 7:30 pm printed as 7:30 pm. The
+		// packages page made the same parse and rendered with wp_date(),
+		// which does apply the offset -- and printed 1:30 pm. Same data,
+		// two answers. Both are now on the same correct footing: parse in
+		// the site timezone, render with wp_date(). Output here is
+		// unchanged; only the reason it is right has changed.
+		$stamp = ans_tb_event_ts( $event_id );
 
 		$out[] = array(
 			'event'    => (int) $event_id,
 			'stamp'    => $stamp,
-			'day'      => $stamp ? date_i18n( 'D', $stamp ) : '',
-			'date'     => $stamp ? date_i18n( 'M j', $stamp ) : get_the_title( $event_id ),
-			'time'     => $stamp ? date_i18n( get_option( 'time_format' ), $stamp ) : '',
+			'day'      => $stamp ? wp_date( 'D', $stamp ) : '',
+			'date'     => $stamp ? wp_date( 'M j', $stamp ) : get_the_title( $event_id ),
+			'time'     => $stamp ? wp_date( get_option( 'time_format' ), $stamp ) : '',
 			'venue'    => (string) get_post_meta( $event_id, 'event_location', true ),
 			'tickets'  => $tickets,
 			'sold_out' => empty( $tickets ),

@@ -116,8 +116,11 @@ function ans_pkg_concerts() {
             $ts       = 0;
             $where    = '';
             if ( $event_id ) {
-                $raw = (string) get_post_meta( $event_id, 'event_date_time', true );
-                $ts  = $raw ? (int) strtotime( $raw ) : 0;
+                // MUST go through ans_tb_local_ts(): the stored value is a naive
+                // site-local wall clock and WordPress runs PHP in UTC, so a bare
+                // strtotime() here printed every performance 6-7 hours early on
+                // this page. See the helper's docblock in the main plugin file.
+                $ts    = ans_tb_event_ts( $event_id );
                 $where = (string) get_post_meta( $event_id, 'event_location', true );
             }
             $product = function_exists( 'wc_get_product' ) ? wc_get_product( $pid ) : null;

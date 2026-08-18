@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.9.3
+ * Version: 1.9.4
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,12 +12,75 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.9.3' );
+define( 'ANS_TB_VERSION', '1.9.4' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
 function ans_tb_perm() {
     return current_user_can( 'manage_options' );
+}
+
+/**
+ * Parse a site-local date string into a Unix timestamp.
+ *
+ * READ THIS BEFORE REACHING FOR strtotime() ANYWHERE NEAR AN EVENT DATE.
+ *
+ * Tickera stores `event_date_time` as a naive wall-clock string, 'Y-m-d H:i',
+ * meaning site-local time — "2026-10-09 19:30" is 7:30 pm in Denver. But
+ * WordPress unconditionally calls date_default_timezone_set('UTC'), so a bare
+ * strtotime() on that string reads it as 7:30 pm UTC. Feed the result to
+ * wp_date(), which correctly renders in the site timezone, and the two
+ * assumptions fight: the page prints 1:30 pm.
+ *
+ * That is not hypothetical. It shipped, and the season-packages page showed
+ * every performance six or seven hours early for weeks — six in October and
+ * April, seven in December and February, because the offset follows daylight
+ * saving. The concert pages escaped only because they happened to use
+ * date_i18n(), whose legacy timestamp handling cancels the same error out.
+ * Two wrongs looking right is worse than one wrong looking wrong.
+ *
+ * So: every read of an event date goes through here, and every render goes
+ * through wp_date(). A string that carries its own offset or timezone is
+ * honoured as written — DateTimeImmutable ignores the fallback zone in that
+ * case, which is the behaviour we want.
+ *
+ * @param string $raw Site-local date string, or one carrying its own offset.
+ * @return int Unix timestamp, or 0 if empty or unparseable.
+ */
+function ans_tb_local_ts( $raw ) {
+    $raw = trim( (string) $raw );
+    if ( '' === $raw ) {
+        return 0;
+    }
+    try {
+        $dt = new DateTimeImmutable( $raw, wp_timezone() );
+    } catch ( Exception $e ) {
+        return 0;
+    }
+    return $dt->getTimestamp();
+}
+
+/**
+ * Start timestamp of a tc_events performance, site-timezone correct.
+ *
+ * @param int $event_id tc_events post ID.
+ * @return int Unix timestamp, or 0 when the event carries no date.
+ */
+function ans_tb_event_ts( $event_id ) {
+    return ans_tb_local_ts( get_post_meta( (int) $event_id, 'event_date_time', true ) );
+}
+
+/**
+ * Midnight this morning, in the site timezone, as a timestamp.
+ *
+ * strtotime('today') resolves against UTC for the reason above, so on a
+ * Mountain evening it lands on tomorrow — which quietly dropped that same
+ * evening's concert out of the season listings while it was still hours away.
+ *
+ * @return int
+ */
+function ans_tb_today_ts() {
+    return ans_tb_local_ts( current_time( 'Y-m-d' ) . ' 00:00' );
 }
 
 add_action( 'rest_api_init', 'ans_tb_register_routes' );
@@ -215,10 +278,30 @@ function ans_tb_params( $req ) {
     return is_array( $p ) ? $p : array();
 }
 
-/** Normalize a date string to Tickera's 'Y-m-d H:i' storage format. */
+/**
+ * Normalize a date string to Tickera's 'Y-m-d H:i' storage format (site-local).
+ *
+ * This used to be strtotime() + gmdate(), which was right only by accident:
+ * both halves assumed UTC, so a naive local string round-tripped unchanged
+ * while the two genuinely wrong cases went unnoticed. An offset-bearing input
+ * ("2026-10-09T19:30:00-06:00") came back as 01:30 the next day and was then
+ * stored as if it were local; a relative input ("now", "today") resolved
+ * against UTC and rolled over to tomorrow every Mountain evening.
+ *
+ * Parsing in the site timezone and formatting in the site timezone is right
+ * for all three cases, and right on purpose rather than by cancellation.
+ */
 function ans_tb_norm_date( $value ) {
-    $ts = strtotime( (string) $value );
-    return $ts ? gmdate( 'Y-m-d H:i', $ts ) : '';
+    $value = trim( (string) $value );
+    if ( '' === $value ) {
+        return '';
+    }
+    try {
+        $dt = new DateTimeImmutable( $value, wp_timezone() );
+    } catch ( Exception $e ) {
+        return '';
+    }
+    return $dt->setTimezone( wp_timezone() )->format( 'Y-m-d H:i' );
 }
 
 /** POST /tickera/event — create a tc_events event with date/location meta. */
@@ -614,8 +697,8 @@ function ans_se_render( $atts ) {
     $want_drafts = ( 'always' === $a['drafts'] ) || ( 'auto' === $a['drafts'] && $can_edit );
     $statuses    = $want_drafts ? array( 'publish', 'draft', 'pending', 'private' ) : array( 'publish' );
 
-    $from_ts = '' !== $a['from'] ? strtotime( $a['from'] ) : ( '1' === (string) $a['show_past'] ? 0 : strtotime( 'today' ) );
-    $to_ts   = '' !== $a['to'] ? strtotime( $a['to'] . ' 23:59' ) : 0;
+    $from_ts = '' !== $a['from'] ? ans_tb_local_ts( $a['from'] ) : ( '1' === (string) $a['show_past'] ? 0 : ans_tb_today_ts() );
+    $to_ts   = '' !== $a['to'] ? ans_tb_local_ts( $a['to'] . ' 23:59' ) : 0;
 
     $posts = get_posts( array(
         'post_type'        => 'tc_events',
@@ -633,7 +716,7 @@ function ans_se_render( $atts ) {
         if ( '' === $raw_date ) {
             continue; // no date = not a real performance yet
         }
-        $ts = strtotime( $raw_date );
+        $ts = ans_tb_local_ts( $raw_date );
         if ( ! $ts ) {
             continue;
         }
@@ -834,8 +917,8 @@ function ans_sp_render( $atts ) {
     $want_drafts = ( 'always' === $a['drafts'] ) || ( 'auto' === $a['drafts'] && $can_edit );
     $statuses    = $want_drafts ? array( 'publish', 'draft', 'pending', 'private' ) : array( 'publish' );
 
-    $from_ts = '' !== $a['from'] ? strtotime( $a['from'] ) : ( '1' === (string) $a['show_past'] ? 0 : strtotime( 'today' ) );
-    $to_ts   = '' !== $a['to'] ? strtotime( $a['to'] . ' 23:59' ) : 0;
+    $from_ts = '' !== $a['from'] ? ans_tb_local_ts( $a['from'] ) : ( '1' === (string) $a['show_past'] ? 0 : ans_tb_today_ts() );
+    $to_ts   = '' !== $a['to'] ? ans_tb_local_ts( $a['to'] . ' 23:59' ) : 0;
 
     $posts = get_posts( array(
         'post_type'   => 'tc_events',
@@ -850,7 +933,7 @@ function ans_sp_render( $atts ) {
             continue;
         }
         $raw = (string) get_post_meta( $po->ID, 'event_date_time', true );
-        $ts  = $raw ? strtotime( $raw ) : 0;
+        $ts  = ans_tb_local_ts( $raw );
         if ( ! $ts ) {
             continue;
         }
