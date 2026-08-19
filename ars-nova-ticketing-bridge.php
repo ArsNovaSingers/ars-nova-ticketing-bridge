@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.10.0
+ * Version: 1.11.0
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.10.0' );
+define( 'ANS_TB_VERSION', '1.11.0' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -190,6 +190,8 @@ function ans_tb_event_payload( $id ) {
         'event_date_time'     => get_post_meta( $id, 'event_date_time', true ),
         'event_end_date_time' => get_post_meta( $id, 'event_end_date_time', true ),
         'event_location'      => get_post_meta( $id, 'event_location', true ),
+        'ans_perk'            => get_post_meta( $id, 'ans_perk', true ),
+        'ans_perk_tier'       => get_post_meta( $id, 'ans_perk_tier', true ),
         'permalink'           => get_permalink( $id ),
         'edit_link'           => html_entity_decode( (string) get_edit_post_link( $id, 'raw' ) ),
         'ticket_types'        => ans_tb_event_ticket_types( $id ),
@@ -510,7 +512,7 @@ function ans_tb_update_event( $req ) {
     }
 
     // Optional presentation metas the season shortcode will prefer if present.
-    foreach ( array( 'ans_display_title', 'ans_note' ) as $key ) {
+    foreach ( array( 'ans_display_title', 'ans_note', 'ans_perk', 'ans_perk_tier' ) as $key ) {
         if ( isset( $p[ $key ] ) ) {
             update_post_meta( $id, $key, sanitize_text_field( $p[ $key ] ) );
         }
@@ -538,6 +540,7 @@ function ans_tb_update_event( $req ) {
     $known = array(
         'id', 'title', 'description', 'status', 'date', 'end_date', 'location',
         'ans_display_title', 'ans_note', 'ans_page_id', 'ans_hide',
+        'ans_perk', 'ans_perk_tier',
     );
     $ignored = array_values( array_diff( array_keys( $p ), $known ) );
     if ( $ignored ) {

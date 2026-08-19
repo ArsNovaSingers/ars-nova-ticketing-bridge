@@ -22,6 +22,15 @@
  * Tickera_Wiki_01 trap #1 (orders not shaped the way Tickera expects generate
  * no tickets, silently).
  *
+ * PERK NIGHTS — added 1.11.0.
+ * A performance can carry a tier perk (the Nova Circle pre-concert talks).
+ * The label lives in the EVENT's own ans_perk meta, with ans_perk_tier naming
+ * the tier it belongs to, so a rescheduled concert carries its talk with it and
+ * Kim can edit it in the Custom Fields panel without a plugin release. Choosing
+ * that tier selects those nights automatically and says so - a patron buying
+ * Nova Circle for the talks should not have to work out which night each talk
+ * falls on. Nothing is locked: any night can still be chosen.
+ *
  * DETAIL MODAL — added 1.10.0.
  * Each tier card carries a "What's included" button that opens a modal
  * describing the tier. Four things about it are deliberate:
@@ -225,9 +234,11 @@ function ans_pkg_concerts() {
 
         $perfs = array();
         foreach ( $product_ids as $pid ) {
-            $event_id = (int) get_post_meta( $pid, '_event_name', true );
-            $ts       = 0;
-            $where    = '';
+            $event_id  = (int) get_post_meta( $pid, '_event_name', true );
+            $ts        = 0;
+            $where     = '';
+            $perk      = '';
+            $perk_tier = '';
             if ( $event_id ) {
                 // MUST go through ans_tb_local_ts(): the stored value is a naive
                 // site-local wall clock and WordPress runs PHP in UTC, so a bare
@@ -235,6 +246,11 @@ function ans_pkg_concerts() {
                 // this page. See the helper's docblock in the main plugin file.
                 $ts    = ans_tb_event_ts( $event_id );
                 $where = (string) get_post_meta( $event_id, 'event_location', true );
+                // Perk label lives on the EVENT, not here, so a rescheduled
+                // concert carries its pre-concert talk with it and Kim can edit
+                // it without a plugin release.
+                $perk      = (string) get_post_meta( $event_id, 'ans_perk', true );
+                $perk_tier = (string) get_post_meta( $event_id, 'ans_perk_tier', true );
             }
             $product = function_exists( 'wc_get_product' ) ? wc_get_product( $pid ) : null;
             if ( ! $product || ! $product->is_purchasable() ) {
@@ -246,6 +262,8 @@ function ans_pkg_concerts() {
                 'when'    => $ts ? wp_date( 'D, M j · g:i a', $ts ) : get_the_title( $pid ),
                 'where'   => function_exists( 'ans_sp_place' ) ? ans_sp_place( $where ) : $where,
                 'price'   => (float) $product->get_regular_price(),
+                'perk'      => $perk,
+                'perk_tier' => $perk_tier ? $perk_tier : 'circle',
             );
         }
         if ( empty( $perfs ) ) {
@@ -334,6 +352,11 @@ function ans_pkg_styles() {
 .ans-pkg__night input{accent-color:#0e1b3a}
 .ans-pkg__night.is-on{background:var(--ans-navy);border-color:var(--ans-navy);color:#fff}
 .ans-pkg__where{opacity:.72;font-size:13px}
+.ans-pkg__perk{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a6d24;background:rgba(199,162,74,.18);border-radius:20px;padding:3px 9px;white-space:nowrap}
+.ans-pkg__night.is-on .ans-pkg__perk{background:rgba(255,255,255,.18);color:#e6c377}
+.ans-pkg__perknote{font-size:14px;line-height:1.55;color:#3a4560;background:var(--ans-cream);border-left:3px solid var(--ans-gold);border-radius:0 10px 10px 0;padding:12px 16px;margin:0 0 18px}
+.ans-pkg__perknote[hidden]{display:none}
+.ans-pkg__perknote b{color:var(--ans-navy)}
 .ans-pkg__bar{position:sticky;bottom:0;background:var(--ans-cream);border-top:2px solid rgba(14,27,58,.14);padding:18px 22px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-radius:12px 12px 0 0}
 .ans-pkg__count{font-size:16px;color:#25304a;flex:1 1 auto;margin:0}
 .ans-pkg__count strong{color:var(--ans-navy)}
@@ -473,6 +496,7 @@ function ans_pkg_render( $atts ) {
 
     <div id="ans-pkg-picker" hidden>
         <p class="ans-pkg__step" id="ans-pkg-steptext">Step 2 — choose your concerts and nights</p>
+        <p class="ans-pkg__perknote" id="ans-pkg-perknote" hidden></p>
         <div class="ans-pkg__concerts">
             <?php foreach ( $concerts as $c ) : ?>
             <div class="ans-pkg__concert" data-term="<?php echo esc_attr( $c['term_id'] ); ?>">
@@ -490,6 +514,9 @@ function ans_pkg_render( $atts ) {
                         <span><?php echo esc_html( $p['when'] ); ?></span>
                         <?php if ( $p['where'] ) : ?>
                         <span class="ans-pkg__where"><?php echo esc_html( $p['where'] ); ?></span>
+                        <?php endif; ?>
+                        <?php if ( ! empty( $p['perk'] ) ) : ?>
+                        <span class="ans-pkg__perk" data-perk-tier="<?php echo esc_attr( $p['perk_tier'] ); ?>">&#9733; <?php echo esc_html( $p['perk'] ); ?></span>
                         <?php endif; ?>
                     </label>
                     <?php endforeach; ?>
@@ -583,6 +610,7 @@ function ans_pkg_render( $atts ) {
     var goBtn = document.getElementById('ans-pkg-go');
     var errEl = document.getElementById('ans-pkg-err');
     var seatsEl = document.getElementById('ans-pkg-seats');
+    var perkNote = document.getElementById('ans-pkg-perknote');
     var tier = null;
 
     function tierByKey(k){ return D.tiers.filter(function(t){ return t.key === k; })[0]; }
@@ -627,6 +655,31 @@ function ans_pkg_render( $atts ) {
         Array.prototype.forEach.call(app.querySelectorAll('.ans-pkg__pick'), function(b){
             b.checked = all;
         });
+
+        // Nights carrying a perk for THIS tier get selected for the patron.
+        // Someone buying Nova Circle for the pre-concert talks should not have
+        // to work out which night each talk is on - but nothing is locked, so
+        // they can still choose any other night.
+        var perks = 0;
+        Array.prototype.forEach.call(app.querySelectorAll('.ans-pkg__concert'), function(c){
+            var want = null;
+            Array.prototype.forEach.call(c.querySelectorAll('.ans-pkg__night'), function(l){
+                var badge = l.querySelector('.ans-pkg__perk');
+                if (badge && badge.getAttribute('data-perk-tier') === tier.key) {
+                    want = l.querySelector('input[type=radio]');
+                }
+            });
+            if (want) { want.checked = true; perks++; }
+        });
+        if (perkNote) {
+            if (perks) {
+                perkNote.innerHTML = '<b>' + perks + ' of your concerts carry a ' + tier.name +
+                    ' extra</b> - marked with a star below. We have chosen those nights for you; change any of them if another date suits.';
+                perkNote.hidden = false;
+            } else {
+                perkNote.hidden = true;
+            }
+        }
         stepEl.textContent = all
             ? 'Step 2 — choose a night for each concert'
             : 'Step 2 — choose any ' + tier.pick + ' concerts, and a night for each';
