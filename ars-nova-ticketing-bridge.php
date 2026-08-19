@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.9.5
+ * Version: 1.9.6
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.9.5' );
+define( 'ANS_TB_VERSION', '1.9.6' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -2136,3 +2136,11 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/ticket-downloads.php';
 
 /* v1.9.5 - read/write the Tickera Mailchimp add-on settings (API key excluded). */
 require_once plugin_dir_path( __FILE__ ) . 'includes/mailchimp-settings.php';
+
+/**
+ * v1.9.6 - read and surgically edit Flycart discount rules. Built after a real
+ * customer was charged $176 for a $160 package because the rules enumerate
+ * product IDs (categories are a PRO feature) and went stale when Springs & Gears
+ * was rebuilt. Until now they had no API surface at all and could not be audited.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/discount-rules.php';
