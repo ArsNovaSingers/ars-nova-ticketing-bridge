@@ -22,6 +22,14 @@
  * Tickera_Wiki_01 trap #1 (orders not shaped the way Tickera expects generate
  * no tickets, silently).
  *
+ * PERK MARK AND EXPLAINER — 1.12.0.
+ * The night chip carries the Nova Circle mark rather than a line of text -
+ * the words crowded the chip. A "?" button sits beside it, OUTSIDE the
+ * <label>: inside, asking what the symbol means would also select that night.
+ * It opens a small popover with the explanation, and a link into the full
+ * tier modal. The symbol keeps its meaning for screen readers through
+ * visually-hidden text, since an icon alone says nothing.
+ *
  * PERK NIGHTS — added 1.11.0.
  * A performance can carry a tier perk (the Nova Circle pre-concert talks).
  * The label lives in the EVENT's own ans_perk meta, with ans_perk_tier naming
@@ -191,6 +199,7 @@ function ans_pkg_tiers() {
                     'd'    => 'Step inside the preparation process at select rehearsals throughout the season. Attend one, two, or all three — the choice is yours.',
                 ),
             ),
+            'perk_explainer' => 'A Nova Circle pre-concert talk happens an hour before this performance: Artistic Director Tom Morgan and the evening\'s guest artist, on what you are about to hear. It is included with the Nova Circle package and only happens on the nights marked here - the other dates are the same concert without the talk.',
             'callout'  => '<b>Choosing your nights:</b> the pre-concert talks happen on <b>October 9</b> (Rivers &amp; Streams), <b>February 7</b> (Sound &amp; Motion) and <b>May 21</b> (the season finale). Pick those nights in Step 2 and you get the talk and the concert together.',
             'foot'     => 'Membership is included when you buy the Nova Circle package. Nothing separate to purchase.',
         ),
@@ -288,6 +297,28 @@ function ans_pkg_concerts() {
 }
 
 /**
+ * The Nova Circle mark, inline.
+ *
+ * The N is the Ars Nova logo's own polygon; the O is one compound path (outer
+ * circle, inner ellipse, evenodd) which is why the sides are heavier than the
+ * top - that is the serif stress, not an accident. The N is drawn in
+ * currentColor so it flips to white on a selected navy chip; a fixed navy N
+ * disappeared there. Full asset set lives in the Brand archive on the shared
+ * drive: Ars Nova Shared Resource Archive/Brand/nova-circle-icon-set/.
+ *
+ * @param string $class Extra class.
+ * @param int    $size  Pixel size.
+ * @return string
+ */
+function ans_pkg_perk_icon( $class = '', $size = 18 ) {
+    return '<svg class="ans-pkg__perkicon ' . esc_attr( $class ) . '" viewBox="0 0 100 100" width="' . (int) $size . '" height="' . (int) $size . '" aria-hidden="true" focusable="false">'
+        . '<path d="M92.5,50 A42.5,42.5 0 1,0 7.5,50 A42.5,42.5 0 1,0 92.5,50 Z M83.5,50 A33.5,40.5 0 1,1 16.5,50 A33.5,40.5 0 1,1 83.5,50 Z" fill="#c7a24a" fill-rule="evenodd"/>'
+        . '<g transform="translate(23.001,26.031) scale(0.45522)">'
+        . '<polygon points="20.08 12.53 16.87 12.53 16.87 12.53 16.82 12.53 16.87 12.81 16.87 94.85 7.76 101.72 7.76 104.47 28.69 104.47 28.7 101.72 19.58 94.85 19.58 38.17 21.9 38.17 21.91 38.22 78.08 94.39 78.08 94.39 68.96 101.26 68.96 104.47 108.81 104.47 108.81 101.26 20.08 12.53" fill="currentColor"/>'
+        . '</g></svg>';
+}
+
+/**
  * Does this tier have enough detail copy to be worth a modal?
  *
  * @param array $t Tier.
@@ -352,9 +383,24 @@ function ans_pkg_styles() {
 .ans-pkg__night input{accent-color:#0e1b3a}
 .ans-pkg__night.is-on{background:var(--ans-navy);border-color:var(--ans-navy);color:#fff}
 .ans-pkg__where{opacity:.72;font-size:13px}
-.ans-pkg__perk{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#8a6d24;background:rgba(199,162,74,.18);border-radius:20px;padding:3px 9px;white-space:nowrap}
-.ans-pkg__night.is-on .ans-pkg__perk{background:rgba(255,255,255,.18);color:#e6c377}
-.ans-pkg__perknote{font-size:14px;line-height:1.55;color:#3a4560;background:var(--ans-cream);border-left:3px solid var(--ans-gold);border-radius:0 10px 10px 0;padding:12px 16px;margin:0 0 18px}
+.ans-pkg__nightwrap{display:inline-flex;align-items:center;gap:4px}
+.ans-pkg__perk{display:inline-flex;align-items:center;line-height:0}
+.ans-pkg__perkicon{display:block;flex:0 0 auto}
+.ans-pkg__why{width:20px;height:20px;flex:0 0 auto;border-radius:50%;border:1px solid rgba(14,27,58,.28);background:#fff;color:#25304a;font:700 12px/1 inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ans-pkg__why:hover{border-color:var(--ans-gold);color:var(--ans-gold-deep)}
+.ans-pkg__why[aria-expanded="true"]{background:var(--ans-navy);border-color:var(--ans-navy);color:#fff}
+.ans-pkg__why:focus-visible{outline:3px solid var(--ans-gold);outline-offset:2px}
+.ans-pkgw[hidden]{display:none}
+.ans-pkgw{position:absolute;z-index:9998;width:min(330px,calc(100vw - 32px));background:#fff;border:1px solid rgba(14,27,58,.16);border-radius:12px;box-shadow:0 18px 44px rgba(9,16,34,.22);padding:16px 18px 14px}
+.ans-pkgw__x{position:absolute;top:8px;right:8px;width:24px;height:24px;border:0;background:none;color:#6b7590;font-size:13px;line-height:1;cursor:pointer;border-radius:50%}
+.ans-pkgw__x:hover{background:rgba(14,27,58,.07);color:var(--ans-navy)}
+.ans-pkgw__title{margin:0 22px 6px 0;font-size:13px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--ans-gold-deep)}
+.ans-pkgw__body{margin:0;font-size:14px;line-height:1.55;color:#3a4560}
+.ans-pkgw__more{margin:12px 0 0;padding:0;border:0;background:none;font:600 14px inherit;color:var(--ans-navy);text-decoration:underline;cursor:pointer}
+.ans-pkgw__more:hover{color:var(--ans-gold-deep)}
+.ans-pkgw__more[hidden]{display:none}
+.ans-pkg__perknote{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.55;color:#3a4560;background:var(--ans-cream);border-left:3px solid var(--ans-gold);border-radius:0 10px 10px 0;padding:12px 16px;margin:0 0 18px}
+.ans-pkg__perkicon--note{margin-top:1px;color:var(--ans-navy)}
 .ans-pkg__perknote[hidden]{display:none}
 .ans-pkg__perknote b{color:var(--ans-navy)}
 .ans-pkg__bar{position:sticky;bottom:0;background:var(--ans-cream);border-top:2px solid rgba(14,27,58,.14);padding:18px 22px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;border-radius:12px 12px 0 0}
@@ -457,12 +503,24 @@ function ans_pkg_render( $atts ) {
     // The modal copy is rendered into the page, not shipped in the payload.
     $payload_tiers = array();
     foreach ( $tiers as $t ) {
-        unset( $t['intro'], $t['subhead'], $t['benefits'], $t['callout'], $t['foot'], $t['meta'], $t['eyebrow'] );
+        unset( $t['intro'], $t['subhead'], $t['benefits'], $t['callout'], $t['foot'], $t['meta'], $t['eyebrow'], $t['perk_explainer'] );
         $payload_tiers[] = $t;
+    }
+
+    $perk_copy = array();
+    foreach ( $tiers as $t ) {
+        if ( ! empty( $t['perk_explainer'] ) ) {
+            $perk_copy[ $t['key'] ] = array(
+                'name'      => $t['name'],
+                'explainer' => $t['perk_explainer'],
+                'hasDetail' => ans_pkg_has_detail( $t ),
+            );
+        }
     }
 
     $payload = array(
         'tiers'    => $payload_tiers,
+        'perkCopy' => $perk_copy,
         'concerts' => $concerts,
         'cartUrl'  => $cart_url,
         'restUrl'  => esc_url_raw( rest_url( 'wc/store/v1/' ) ),
@@ -496,7 +554,7 @@ function ans_pkg_render( $atts ) {
 
     <div id="ans-pkg-picker" hidden>
         <p class="ans-pkg__step" id="ans-pkg-steptext">Step 2 — choose your concerts and nights</p>
-        <p class="ans-pkg__perknote" id="ans-pkg-perknote" hidden></p>
+        <p class="ans-pkg__perknote" id="ans-pkg-perknote" hidden><?php echo ans_pkg_perk_icon( 'ans-pkg__perkicon--note', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span id="ans-pkg-perknote-text"></span></p>
         <div class="ans-pkg__concerts">
             <?php foreach ( $concerts as $c ) : ?>
             <div class="ans-pkg__concert" data-term="<?php echo esc_attr( $c['term_id'] ); ?>">
@@ -506,6 +564,7 @@ function ans_pkg_render( $atts ) {
                 </label>
                 <div class="ans-pkg__nights">
                     <?php foreach ( $c['performances'] as $i => $p ) : ?>
+                    <span class="ans-pkg__nightwrap">
                     <label class="ans-pkg__night<?php echo 0 === $i ? ' is-on' : ''; ?>">
                         <input type="radio"
                                name="night-<?php echo esc_attr( $c['term_id'] ); ?>"
@@ -516,9 +575,20 @@ function ans_pkg_render( $atts ) {
                         <span class="ans-pkg__where"><?php echo esc_html( $p['where'] ); ?></span>
                         <?php endif; ?>
                         <?php if ( ! empty( $p['perk'] ) ) : ?>
-                        <span class="ans-pkg__perk" data-perk-tier="<?php echo esc_attr( $p['perk_tier'] ); ?>">&#9733; <?php echo esc_html( $p['perk'] ); ?></span>
+                        <span class="ans-pkg__perk" data-perk-tier="<?php echo esc_attr( $p['perk_tier'] ); ?>">
+                            <?php echo ans_pkg_perk_icon(); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+                            <span class="screen-reader-text"><?php echo esc_html( $p['perk'] ); ?></span>
+                        </span>
                         <?php endif; ?>
                     </label>
+                    <?php if ( ! empty( $p['perk'] ) ) : ?>
+                    <button type="button" class="ans-pkg__why"
+                            data-why="<?php echo esc_attr( $p['perk_tier'] ); ?>"
+                            data-why-label="<?php echo esc_attr( $p['perk'] ); ?>"
+                            aria-haspopup="dialog" aria-expanded="false"
+                            aria-label="What does this mark mean?">?</button>
+                    <?php endif; ?>
+                    </span>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -539,6 +609,13 @@ function ans_pkg_render( $atts ) {
         <p class="ans-pkg__err" id="ans-pkg-err" hidden></p>
         <p class="ans-pkg__note">Your package discount is applied automatically in the cart. Each concert is a real ticket — you'll receive one per performance.</p>
     </div>
+</div>
+
+<div class="ans-pkgw" id="ans-pkg-why" hidden role="dialog" aria-modal="false" aria-labelledby="ans-pkg-why-title">
+    <button type="button" class="ans-pkgw__x" data-why-close aria-label="Close">&#10005;</button>
+    <p class="ans-pkgw__title" id="ans-pkg-why-title"></p>
+    <p class="ans-pkgw__body" id="ans-pkg-why-body"></p>
+    <button type="button" class="ans-pkgw__more" id="ans-pkg-why-more" hidden></button>
 </div>
 
 <div class="ans-pkgm" id="ans-pkg-modal" hidden>
@@ -611,6 +688,12 @@ function ans_pkg_render( $atts ) {
     var errEl = document.getElementById('ans-pkg-err');
     var seatsEl = document.getElementById('ans-pkg-seats');
     var perkNote = document.getElementById('ans-pkg-perknote');
+    var perkNoteText = document.getElementById('ans-pkg-perknote-text');
+    var why = document.getElementById('ans-pkg-why');
+    var whyTitle = document.getElementById('ans-pkg-why-title');
+    var whyBody = document.getElementById('ans-pkg-why-body');
+    var whyMore = document.getElementById('ans-pkg-why-more');
+    var whyBtn = null;
     var tier = null;
 
     function tierByKey(k){ return D.tiers.filter(function(t){ return t.key === k; })[0]; }
@@ -672,9 +755,9 @@ function ans_pkg_render( $atts ) {
             if (want) { want.checked = true; perks++; }
         });
         if (perkNote) {
-            if (perks) {
-                perkNote.innerHTML = '<b>' + perks + ' of your concerts carry a ' + tier.name +
-                    ' extra</b> - marked with a star below. We have chosen those nights for you; change any of them if another date suits.';
+            if (perks && perkNoteText) {
+                perkNoteText.innerHTML = '<b>' + perks + ' of your concerts carry a ' + tier.name +
+                    ' extra</b> - marked with this symbol below. We have chosen those nights for you; change any of them if another date suits.';
                 perkNote.hidden = false;
             } else {
                 perkNote.hidden = true;
@@ -763,6 +846,77 @@ function ans_pkg_render( $atts ) {
             if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
             else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
         });
+    }
+
+    /* ------------------------- the "?" explainer ------------------------- */
+    function closeWhy(refocus){
+        if (!why || why.hidden) return;
+        why.hidden = true;
+        if (whyBtn) {
+            whyBtn.setAttribute('aria-expanded', 'false');
+            if (refocus) whyBtn.focus();
+        }
+        whyBtn = null;
+    }
+
+    function openWhy(btn){
+        if (!why) return;
+        var key = btn.getAttribute('data-why');
+        var copy = (D.perkCopy || {})[key];
+        if (!copy) return;
+
+        whyTitle.textContent = btn.getAttribute('data-why-label') || copy.name;
+        whyBody.textContent = copy.explainer;
+        if (copy.hasDetail) {
+            whyMore.textContent = 'See everything in ' + copy.name;
+            whyMore.setAttribute('data-tier', key);
+            whyMore.hidden = false;
+        } else {
+            whyMore.hidden = true;
+        }
+
+        // Show first so it can be measured, then place it under the button,
+        // nudged back inside the viewport if it would overhang the right edge.
+        why.hidden = false;
+        var r = btn.getBoundingClientRect();
+        var w = why.offsetWidth;
+        var left = window.pageXOffset + r.left + r.width / 2 - w / 2;
+        var max = window.pageXOffset + document.documentElement.clientWidth - w - 12;
+        left = Math.max(window.pageXOffset + 12, Math.min(left, max));
+        why.style.left = left + 'px';
+        why.style.top = (window.pageYOffset + r.bottom + 10) + 'px';
+
+        if (whyBtn && whyBtn !== btn) whyBtn.setAttribute('aria-expanded', 'false');
+        whyBtn = btn;
+        btn.setAttribute('aria-expanded', 'true');
+        why.querySelector('.ans-pkgw__x').focus();
+    }
+
+    app.addEventListener('click', function(e){
+        var b = e.target.closest('.ans-pkg__why');
+        if (!b) return;
+        // The button sits OUTSIDE the <label> on purpose - inside it, asking the
+        // question would also pick the night.
+        e.preventDefault();
+        if (whyBtn === b && !why.hidden) { closeWhy(true); return; }
+        openWhy(b);
+    });
+
+    if (why) {
+        why.addEventListener('click', function(e){
+            if (e.target.closest('[data-why-close]')) { closeWhy(true); return; }
+            var more = e.target.closest('.ans-pkgw__more');
+            if (more) { var k = more.getAttribute('data-tier'); closeWhy(false); openModal(k); }
+        });
+        document.addEventListener('click', function(e){
+            if (why.hidden) return;
+            if (e.target.closest('#ans-pkg-why') || e.target.closest('.ans-pkg__why')) return;
+            closeWhy(false);
+        });
+        document.addEventListener('keydown', function(e){
+            if (!why.hidden && (e.key === 'Escape' || e.key === 'Esc')) closeWhy(true);
+        });
+        window.addEventListener('resize', function(){ closeWhy(false); });
     }
 
     goBtn.addEventListener('click', async function(){
