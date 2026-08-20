@@ -42,6 +42,9 @@
  * DETAIL MODAL — added 1.10.0.
  * Each tier card carries a "What's included" button that opens a modal
  * describing the tier. Four things about it are deliberate:
+ *   0. The mark is set at 27px on the chip and 30px in the legend - 18px was
+ *      too small to read as the Nova Circle mark rather than a smudge
+ *      (Jonathan, 2026-08-20). Change it in ans_pkg_perk_icon()'s default.
  *   1. The panels are rendered SERVER-SIDE and hidden, not built from the JSON
  *      payload. The copy is therefore in the page for search engines and for
  *      anyone whose JS fails, and nothing is injected as unescaped HTML.
@@ -163,6 +166,7 @@ function ans_pkg_tiers() {
             'save'   => 'Premium tier',
             'blurb'  => 'All five concerts, premium reserved seating, and exclusive guest-artist events.',
             'extra_sku' => 'ANS-PKG-CIRCLE-FEE',
+            'mark'      => true,
 
             'eyebrow'  => 'A special circle of support',
             'meta'     => '<b>$300</b> · all five concerts · membership included',
@@ -310,7 +314,7 @@ function ans_pkg_concerts() {
  * @param int    $size  Pixel size.
  * @return string
  */
-function ans_pkg_perk_icon( $class = '', $size = 18 ) {
+function ans_pkg_perk_icon( $class = '', $size = 27 ) {
     return '<svg class="ans-pkg__perkicon ' . esc_attr( $class ) . '" viewBox="0 0 100 100" width="' . (int) $size . '" height="' . (int) $size . '" aria-hidden="true" focusable="false">'
         . '<path d="M92.5,50 A42.5,42.5 0 1,0 7.5,50 A42.5,42.5 0 1,0 92.5,50 Z M83.5,50 A33.5,40.5 0 1,1 16.5,50 A33.5,40.5 0 1,1 83.5,50 Z" fill="#c7a24a" fill-rule="evenodd"/>'
         . '<g transform="translate(23.001,26.031) scale(0.45522)">'
@@ -350,6 +354,12 @@ function ans_pkg_detail_art( $t ) {
     return $src ? $src : '';
 }
 
+/*
+ * Note on .ans-pkg__perkicon: the negative vertical margin is load-bearing.
+ * At 27px the mark is taller than the chip text, and without it the perk
+ * chips stand 11px taller than their neighbours, so a row of nights comes
+ * out ragged. The margin lets the mark overflow the line box instead.
+ */
 function ans_pkg_styles() {
     static $done = false;
     if ( $done ) {
@@ -362,7 +372,8 @@ function ans_pkg_styles() {
 .ans-pkg__tier{flex:1 1 260px;display:flex;flex-direction:column;border:2px solid rgba(14,27,58,.16);border-radius:14px;padding:26px 24px;cursor:pointer;background:#fff;transition:border-color .15s,box-shadow .15s}
 .ans-pkg__tier:hover{border-color:var(--ans-gold)}
 .ans-pkg__tier.is-on{border-color:var(--ans-navy);box-shadow:0 6px 26px rgba(14,27,58,.13)}
-.ans-pkg__tier h3{font-size:23px;margin:0 0 6px;color:var(--ans-navy)}
+.ans-pkg__tier h3{display:flex;align-items:center;gap:10px;font-size:23px;margin:0 0 6px;color:var(--ans-navy)}
+.ans-pkg__tiermark{flex:0 0 auto;margin:0}
 .ans-pkg__price{font-size:34px;font-weight:700;color:var(--ans-navy);margin:0 0 2px}
 .ans-pkg__per{font-size:13px;letter-spacing:1.5px;text-transform:uppercase;color:#8a6d24;margin:0 0 12px}
 .ans-pkg__blurb{font-size:15px;line-height:1.6;color:#3a4560;margin:0;min-height:4.8em}
@@ -383,10 +394,12 @@ function ans_pkg_styles() {
 .ans-pkg__night input{accent-color:#0e1b3a}
 .ans-pkg__night.is-on{background:var(--ans-navy);border-color:var(--ans-navy);color:#fff}
 .ans-pkg__where{opacity:.72;font-size:13px}
-.ans-pkg__nightwrap{display:inline-flex;align-items:center;gap:4px}
+.ans-pkg__nightwrap{display:inline-flex;align-items:center;gap:5px}
+.ans-pkg__night:has(.ans-pkg__perk){padding-right:10px}
 .ans-pkg__perk{display:inline-flex;align-items:center;line-height:0}
+.ans-pkg__perk .ans-pkg__perkicon{display:block;flex:0 0 auto;margin:-7px 0}
 .ans-pkg__perkicon{display:block;flex:0 0 auto}
-.ans-pkg__why{width:20px;height:20px;flex:0 0 auto;border-radius:50%;border:1px solid rgba(14,27,58,.28);background:#fff;color:#25304a;font:700 12px/1 inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ans-pkg__why{width:22px;height:22px;flex:0 0 auto;border-radius:50%;border:1px solid rgba(14,27,58,.28);background:#fff;color:#25304a;font:700 12px/1 inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0}
 .ans-pkg__why:hover{border-color:var(--ans-gold);color:var(--ans-gold-deep)}
 .ans-pkg__why[aria-expanded="true"]{background:var(--ans-navy);border-color:var(--ans-navy);color:#fff}
 .ans-pkg__why:focus-visible{outline:3px solid var(--ans-gold);outline-offset:2px}
@@ -503,7 +516,7 @@ function ans_pkg_render( $atts ) {
     // The modal copy is rendered into the page, not shipped in the payload.
     $payload_tiers = array();
     foreach ( $tiers as $t ) {
-        unset( $t['intro'], $t['subhead'], $t['benefits'], $t['callout'], $t['foot'], $t['meta'], $t['eyebrow'], $t['perk_explainer'] );
+        unset( $t['intro'], $t['subhead'], $t['benefits'], $t['callout'], $t['foot'], $t['meta'], $t['eyebrow'], $t['perk_explainer'], $t['mark'] );
         $payload_tiers[] = $t;
     }
 
@@ -536,7 +549,12 @@ function ans_pkg_render( $atts ) {
     <div class="ans-pkg__tiers">
         <?php foreach ( $tiers as $t ) : ?>
         <div class="ans-pkg__tier" data-tier="<?php echo esc_attr( $t['key'] ); ?>" role="button" tabindex="0">
-            <h3><?php echo esc_html( $t['name'] ); ?></h3>
+            <h3>
+                <?php if ( ! empty( $t['mark'] ) ) : ?>
+                <?php echo ans_pkg_perk_icon( 'ans-pkg__tiermark', 30 ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+                <?php endif; ?>
+                <span><?php echo esc_html( $t['name'] ); ?></span>
+            </h3>
             <p class="ans-pkg__price">$<?php echo esc_html( number_format_i18n( $t['price'] ) ); ?></p>
             <p class="ans-pkg__per">
                 <?php echo esc_html( $t['per'] ? '$' . $t['per'] . ' per concert · ' . $t['save'] : $t['save'] ); ?>
@@ -554,7 +572,7 @@ function ans_pkg_render( $atts ) {
 
     <div id="ans-pkg-picker" hidden>
         <p class="ans-pkg__step" id="ans-pkg-steptext">Step 2 — choose your concerts and nights</p>
-        <p class="ans-pkg__perknote" id="ans-pkg-perknote" hidden><?php echo ans_pkg_perk_icon( 'ans-pkg__perkicon--note', 20 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span id="ans-pkg-perknote-text"></span></p>
+        <p class="ans-pkg__perknote" id="ans-pkg-perknote" hidden><?php echo ans_pkg_perk_icon( 'ans-pkg__perkicon--note', 30 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span id="ans-pkg-perknote-text"></span></p>
         <div class="ans-pkg__concerts">
             <?php foreach ( $concerts as $c ) : ?>
             <div class="ans-pkg__concert" data-term="<?php echo esc_attr( $c['term_id'] ); ?>">
