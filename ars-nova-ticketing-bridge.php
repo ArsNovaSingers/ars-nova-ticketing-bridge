@@ -2265,6 +2265,18 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/mailchimp-settings.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/discount-rules.php';
 
 /**
+ * v1.13.0 - compose customer-facing ticket names from the normalised event
+ * fields instead of the stored product name.
+ *
+ * This require line is v1.14.0's, not v1.13.0's. The file landed on main
+ * complete and syntactically clean, but nothing ever loaded it, so the whole
+ * feature was inert on every install - the failure mode this project has
+ * already recorded once as "code existing in a repo is not the same as code
+ * being wired in". Check the registration point, not just the file list.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/display-names.php';
+
+/**
  * v1.14.0 - [ans_circle_lineup], the Nova Circle benefit lineup for
  * /nova-circle/. Selects by PERK TIER rather than by ans_event_kind, because a
  * Circle benefit can be a dedicated perk event OR a pre-concert talk marked on
