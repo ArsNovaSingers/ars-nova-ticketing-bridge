@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.12.0
+ * Version: 1.14.0
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.12.0' );
+define( 'ANS_TB_VERSION', '1.14.0' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -81,6 +81,84 @@ function ans_tb_event_ts( $event_id ) {
  */
 function ans_tb_today_ts() {
     return ans_tb_local_ts( current_time( 'Y-m-d' ) . ' 00:00' );
+}
+
+/* -------------------------------------------------------------------------
+ * v1.14.0 - what KIND of thing a tc_events post is.
+ *
+ * tc_events was only ever a performance. It is now also the season-long Nova
+ * Circle membership and the Circle's own perk evenings, and [ans_season_projects]
+ * had no way to tell them apart: it enumerated every event in its date window,
+ * so "Nova Circle Membership 2026/27" fell into the uncategorised fallback and
+ * rendered on the public /this-season/ page as a bare project card.
+ *
+ * The meta key is `ans_event_kind`, deliberately WITHOUT an underscore prefix -
+ * exactly like ans_perk and ans_perk_tier. An underscore-prefixed key is hidden
+ * from WordPress's Custom Fields panel, and hiding it would mean Kim needs a
+ * plugin release to reclassify one event. She should not.
+ * ----------------------------------------------------------------------- */
+
+/**
+ * The values `ans_event_kind` is allowed to take.
+ *
+ * @return string[]
+ */
+function ans_tb_event_kinds() {
+    return array( 'concert', 'membership', 'perk', 'private' );
+}
+
+/**
+ * The kind of a tc_events post, normalised.
+ *
+ * Unset or empty means `concert`. That is what makes this change safe to ship:
+ * every event that already exists keeps behaving exactly as it does today, and
+ * no data migration has to run before the code lands.
+ *
+ * An unrecognised value ALSO falls back to `concert`, and that direction is
+ * chosen on purpose. A typo has to fail VISIBLE - a stray card on This Season
+ * that somebody notices and reports - rather than fail HIDDEN, which is what
+ * returning something like 'private' would do: a real concert would silently
+ * vanish from the season listing and nobody would find out until a patron
+ * could not find the night they wanted. The noisy failure is the recoverable
+ * one. ans_tb_event_payload() returns the raw stored value alongside this
+ * normalised one so a typo can still be audited rather than merely absorbed.
+ *
+ * @param int $event_id tc_events post ID.
+ * @return string One of ans_tb_event_kinds().
+ */
+function ans_tb_event_kind( $event_id ) {
+    $kind = strtolower( trim( (string) get_post_meta( (int) $event_id, 'ans_event_kind', true ) ) );
+    if ( '' === $kind || ! in_array( $kind, ans_tb_event_kinds(), true ) ) {
+        return 'concert';
+    }
+    return $kind;
+}
+
+/**
+ * Parse a shortcode `kind` attribute into a list of kinds to allow.
+ *
+ * Shared by [ans_season_events] and [ans_season_projects] so the two cannot
+ * drift apart - the whole defect being fixed here is one listing knowing
+ * something the other does not.
+ *
+ * @param string $raw Comma-separated list, or the literal "any".
+ * @return string[] Kinds to allow; an EMPTY array means do not filter at all.
+ */
+function ans_tb_kind_filter( $raw ) {
+    $raw = strtolower( trim( (string) $raw ) );
+    if ( '' === $raw || 'any' === $raw ) {
+        return array();
+    }
+    $kinds = array();
+    foreach ( explode( ',', $raw ) as $k ) {
+        $k = trim( $k );
+        if ( '' !== $k ) {
+            $kinds[] = $k;
+        }
+    }
+    // An attribute that parses to nothing (kind=" , ,") means the author asked
+    // for no filter, not for an empty page.
+    return array_values( array_unique( $kinds ) );
 }
 
 add_action( 'rest_api_init', 'ans_tb_register_routes' );
@@ -192,6 +270,18 @@ function ans_tb_event_payload( $id ) {
         'event_location'      => get_post_meta( $id, 'event_location', true ),
         'ans_perk'            => get_post_meta( $id, 'ans_perk', true ),
         'ans_perk_tier'       => get_post_meta( $id, 'ans_perk_tier', true ),
+        /*
+         * Both the normalised kind and the raw stored string.
+         *
+         * The normaliser silently absorbs anything it does not recognise (see
+         * ans_tb_event_kind), so on its own it would report a healthy-looking
+         * 'concert' for an event somebody typed 'membrship' into - the write
+         * would look applied and the classification would be wrong. Returning
+         * the raw value too means a write is verified by READING IT BACK
+         * rather than trusted, and an audit can find the typo.
+         */
+        'ans_event_kind'      => ans_tb_event_kind( $id ),
+        'ans_event_kind_raw'  => get_post_meta( $id, 'ans_event_kind', true ),
         'permalink'           => get_permalink( $id ),
         'edit_link'           => html_entity_decode( (string) get_edit_post_link( $id, 'raw' ) ),
         'ticket_types'        => ans_tb_event_ticket_types( $id ),
@@ -512,7 +602,7 @@ function ans_tb_update_event( $req ) {
     }
 
     // Optional presentation metas the season shortcode will prefer if present.
-    foreach ( array( 'ans_display_title', 'ans_note', 'ans_perk', 'ans_perk_tier' ) as $key ) {
+    foreach ( array( 'ans_display_title', 'ans_note', 'ans_perk', 'ans_perk_tier', 'ans_event_kind' ) as $key ) {
         if ( isset( $p[ $key ] ) ) {
             update_post_meta( $id, $key, sanitize_text_field( $p[ $key ] ) );
         }
@@ -540,7 +630,7 @@ function ans_tb_update_event( $req ) {
     $known = array(
         'id', 'title', 'description', 'status', 'date', 'end_date', 'location',
         'ans_display_title', 'ans_note', 'ans_page_id', 'ans_hide',
-        'ans_perk', 'ans_perk_tier',
+        'ans_perk', 'ans_perk_tier', 'ans_event_kind',
     );
     $ignored = array_values( array_diff( array_keys( $p ), $known ) );
     if ( $ignored ) {
@@ -583,6 +673,11 @@ function ans_tb_delete_event( $req ) {
  *   show_past="0"       include events before `from`. Default 0.
  *   drafts="auto"       auto = logged-in editors also see drafts (badged);
  *                       never = publish only; always = include drafts for all.
+ *   kind="concert"      which kinds of event to list, comma-separated
+ *                       (concert, membership, perk, private) - or "any" to
+ *                       switch the filter off. Default: concerts only, so a
+ *                       membership or a perk evening cannot leak into a
+ *                       public performance listing.
  *
  * Public visitors only ever see published events. Editors see drafts marked
  * "DRAFT — not public" so the page can be previewed before launch.
@@ -689,6 +784,7 @@ function ans_se_render( $atts ) {
         'group_by_month' => '1',
         'show_past'      => '0',
         'drafts'         => 'auto',
+        'kind'           => 'concert',
         'empty_text'     => 'Performance dates will be announced here.',
     ), $atts, 'ans_season_events' );
 
@@ -703,6 +799,9 @@ function ans_se_render( $atts ) {
     $from_ts = '' !== $a['from'] ? ans_tb_local_ts( $a['from'] ) : ( '1' === (string) $a['show_past'] ? 0 : ans_tb_today_ts() );
     $to_ts   = '' !== $a['to'] ? ans_tb_local_ts( $a['to'] . ' 23:59' ) : 0;
 
+    // Parsed once, not per event. Empty = no filtering (kind="any").
+    $kinds = ans_tb_kind_filter( $a['kind'] );
+
     $posts = get_posts( array(
         'post_type'        => 'tc_events',
         'post_status'      => $statuses,
@@ -713,6 +812,9 @@ function ans_se_render( $atts ) {
     $rows = array();
     foreach ( $posts as $po ) {
         if ( get_post_meta( $po->ID, 'ans_hide', true ) ) {
+            continue;
+        }
+        if ( $kinds && ! in_array( ans_tb_event_kind( $po->ID ), $kinds, true ) ) {
             continue;
         }
         $raw_date = (string) get_post_meta( $po->ID, 'event_date_time', true );
@@ -836,6 +938,11 @@ function ans_se_render( $atts ) {
  *   to="2027-08-31"    latest. Default: none.
  *   show_past="0"      include projects whose dates have all passed.
  *   drafts="auto"      auto = editors also see drafts (badged); never | always.
+ *   kind="concert"     which kinds of event to consider, comma-separated
+ *                      (concert, membership, perk, private) - or "any" to
+ *                      switch the filter off. Default: concerts only. This is
+ *                      what stops the Nova Circle membership and the Circle's
+ *                      perk evenings from rendering here as project cards.
  *   limit="20"         max projects.
  *   empty_text="..."   shown when nothing matches.
  * ----------------------------------------------------------------------- */
@@ -908,6 +1015,7 @@ function ans_sp_render( $atts ) {
         'to'         => '',
         'show_past'  => '0',
         'drafts'     => 'auto',
+        'kind'       => 'concert',
         'limit'      => 20,
         'empty_text' => 'This season\'s projects will be announced here.',
     ), $atts, 'ans_season_projects' );
@@ -923,6 +1031,9 @@ function ans_sp_render( $atts ) {
     $from_ts = '' !== $a['from'] ? ans_tb_local_ts( $a['from'] ) : ( '1' === (string) $a['show_past'] ? 0 : ans_tb_today_ts() );
     $to_ts   = '' !== $a['to'] ? ans_tb_local_ts( $a['to'] . ' 23:59' ) : 0;
 
+    // Parsed once, not per event. Empty = no filtering (kind="any").
+    $kinds = ans_tb_kind_filter( $a['kind'] );
+
     $posts = get_posts( array(
         'post_type'   => 'tc_events',
         'post_status' => $statuses,
@@ -933,6 +1044,11 @@ function ans_sp_render( $atts ) {
     $projects = array();
     foreach ( $posts as $po ) {
         if ( get_post_meta( $po->ID, 'ans_hide', true ) ) {
+            continue;
+        }
+        // ans_hide above stays the per-event manual override. This is the
+        // class-level rule: a membership or a perk evening is not a project.
+        if ( $kinds && ! in_array( ans_tb_event_kind( $po->ID ), $kinds, true ) ) {
             continue;
         }
         $raw = (string) get_post_meta( $po->ID, 'event_date_time', true );
@@ -2147,3 +2263,11 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/mailchimp-settings.php';
  * was rebuilt. Until now they had no API surface at all and could not be audited.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/discount-rules.php';
+
+/**
+ * v1.14.0 - [ans_circle_lineup], the Nova Circle benefit lineup for
+ * /nova-circle/. Selects by PERK TIER rather than by ans_event_kind, because a
+ * Circle benefit can be a dedicated perk event OR a pre-concert talk marked on
+ * an ordinary concert night, and both have to appear in the same list.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/circle-lineup.php';
