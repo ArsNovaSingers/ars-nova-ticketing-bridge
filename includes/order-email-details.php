@@ -252,7 +252,11 @@ function ans_tb_event_details( $event_id ) {
 		}
 	}
 
-	$location = trim( (string) get_post_meta( $event_id, 'event_location', true ) );
+	// Private address when the event has one (house concerts), else the public
+	// location. See includes/event-private-location.php.
+	$location = function_exists( 'ans_tb_event_location' )
+		? ans_tb_event_location( $event_id )
+		: trim( (string) get_post_meta( $event_id, 'event_location', true ) );
 
 	return array(
 		'id'        => $event_id,
