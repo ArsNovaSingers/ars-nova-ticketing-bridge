@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.17.0
+ * Version: 1.18.0
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.17.0' );
+define( 'ANS_TB_VERSION', '1.18.0' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -2322,3 +2322,11 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/order-email-details.php';
  * address, never the customer.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/order-email-preview.php';
+
+/**
+ * A venue address the website never shows. Tickera has ONE location field and the
+ * public event page prints it, so the September house concert cannot carry its real
+ * street address. Adds a private per-event address read only by the ticket PDF and
+ * the confirmation email, falling back to event_location everywhere else.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/event-private-location.php';
