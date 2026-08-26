@@ -2283,3 +2283,10 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/display-names.php';
  * an ordinary concert night, and both have to appear in the same list.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/circle-lineup.php';
+
+/**
+ * Refunding a WooCommerce order voids its Tickera tickets. The Tickera bridge only
+ * voids on CANCELLED and actively re-publishes tickets on a refund, so a refunded
+ * patron keeps a scannable ticket. Verified on Live 2026-08-26.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/refund-voids-tickets.php';
