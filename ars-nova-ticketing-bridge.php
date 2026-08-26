@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.16.0
+ * Version: 1.17.0
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.16.0' );
+define( 'ANS_TB_VERSION', '1.17.0' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -2313,3 +2313,12 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/void-historic-refund-ticket
  * Attaches the PDF, makes the link a button, and puts date/venue/address on top.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/order-email-details.php';
+
+/**
+ * Render a real order email without sending it. v1.16.0 changed what the
+ * confirmation email contains and there was no way to look at the result - no
+ * connector can trigger a WooCommerce email and there is no shell on the server,
+ * so email changes were shipping unseen. Admin-only; POST mails only a named
+ * address, never the customer.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/order-email-preview.php';
