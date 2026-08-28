@@ -211,8 +211,9 @@ add_filter(
  *
  * display-names.php freezes a "Where" row onto the line item at purchase, taken
  * from the PUBLIC location, and that row is what the order-summary table in the
- * confirmation email shows. Today it contradicts the ticket box directly above
- * it, which already prints the real address.
+ * confirmation email shows. Without this, that row and the ticket box above it
+ * can disagree, because the box resolves the private address and the row does
+ * not.
  *
  * This runs at priority 20, after ans_dn_freeze_line_item at 10, and corrects
  * the frozen copy only. It deliberately does NOT filter ans_dn_rows: those rows
