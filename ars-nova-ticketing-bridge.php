@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.18.0
+ * Version: 1.18.1
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.18.0' );
+define( 'ANS_TB_VERSION', '1.18.1' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -26,14 +26,14 @@ function ans_tb_perm() {
  * READ THIS BEFORE REACHING FOR strtotime() ANYWHERE NEAR AN EVENT DATE.
  *
  * Tickera stores `event_date_time` as a naive wall-clock string, 'Y-m-d H:i',
- * meaning site-local time â€” "2026-10-09 19:30" is 7:30 pm in Denver. But
+ * meaning site-local time — "2026-10-09 19:30" is 7:30 pm in Denver. But
  * WordPress unconditionally calls date_default_timezone_set('UTC'), so a bare
  * strtotime() on that string reads it as 7:30 pm UTC. Feed the result to
  * wp_date(), which correctly renders in the site timezone, and the two
  * assumptions fight: the page prints 1:30 pm.
  *
  * That is not hypothetical. It shipped, and the season-packages page showed
- * every performance six or seven hours early for weeks â€” six in October and
+ * every performance six or seven hours early for weeks — six in October and
  * April, seven in December and February, because the offset follows daylight
  * saving. The concert pages escaped only because they happened to use
  * date_i18n(), whose legacy timestamp handling cancels the same error out.
@@ -41,7 +41,7 @@ function ans_tb_perm() {
  *
  * So: every read of an event date goes through here, and every render goes
  * through wp_date(). A string that carries its own offset or timezone is
- * honoured as written â€” DateTimeImmutable ignores the fallback zone in that
+ * honoured as written — DateTimeImmutable ignores the fallback zone in that
  * case, which is the behaviour we want.
  *
  * @param string $raw Site-local date string, or one carrying its own offset.
@@ -74,7 +74,7 @@ function ans_tb_event_ts( $event_id ) {
  * Midnight this morning, in the site timezone, as a timestamp.
  *
  * strtotime('today') resolves against UTC for the reason above, so on a
- * Mountain evening it lands on tomorrow â€” which quietly dropped that same
+ * Mountain evening it lands on tomorrow — which quietly dropped that same
  * evening's concert out of the season listings while it was still hours away.
  *
  * @return int
@@ -245,7 +245,7 @@ function ans_tb_bridge_active() {
     return is_plugin_active( 'bridge-for-woocommerce/bridge-for-woocommerce.php' );
 }
 
-/** GET /tickera/status â€” environment probe so the connector can verify prerequisites. */
+/** GET /tickera/status — environment probe so the connector can verify prerequisites. */
 function ans_tb_status() {
     return array(
         'plugin'              => 'ars-nova-ticketing-bridge',
@@ -396,7 +396,7 @@ function ans_tb_norm_date( $value ) {
     return $dt->setTimezone( wp_timezone() )->format( 'Y-m-d H:i' );
 }
 
-/** POST /tickera/event â€” create a tc_events event with date/location meta. */
+/** POST /tickera/event — create a tc_events event with date/location meta. */
 function ans_tb_create_event( $req ) {
     if ( ! post_type_exists( 'tc_events' ) ) {
         return new WP_Error( 'tickera_inactive', 'Tickera is not active (no tc_events post type).', array( 'status' => 400 ) );
@@ -438,7 +438,7 @@ function ans_tb_create_event( $req ) {
     return ans_tb_event_payload( $post_id );
 }
 
-/** POST /tickera/ticket-type â€” create a WooCommerce product wired as a Tickera ticket. */
+/** POST /tickera/ticket-type — create a WooCommerce product wired as a Tickera ticket. */
 function ans_tb_create_ticket_type( $req ) {
     if ( ! class_exists( 'WooCommerce' ) || ! class_exists( 'WC_Product_Simple' ) ) {
         return new WP_Error( 'woo_inactive', 'WooCommerce is not active.', array( 'status' => 400 ) );
@@ -501,7 +501,7 @@ function ans_tb_create_ticket_type( $req ) {
     // through the WooCommerce admin UI and diffing its post meta against ours.
     //
     // Tickera 3.6.0.0 uses UNDERSCORE-PREFIXED keys. This plugin previously wrote
-    // `_ticket`, `event_name` and `ticket_template`, which Tickera never reads â€”
+    // `_ticket`, `event_name` and `ticket_template`, which Tickera never reads —
     // so every ticket product it created was invisible to Tickera. That single
     // mistake caused the empty ticket table, "Unknown ticket ID" and the USD0
     // price. Do not "tidy" these names.
@@ -553,10 +553,10 @@ function ans_tb_list_ticket_types( $req ) {
 }
 
 /* ============================================================================
- * v1.1.0 â€” event update / delete, and the [ans_season_events] display shortcode
+ * v1.1.0 — event update / delete, and the [ans_season_events] display shortcode
  * ========================================================================== */
 
-/** POST|PUT|PATCH /tickera/event/{id} â€” update an existing tc_events post. */
+/** POST|PUT|PATCH /tickera/event/{id} — update an existing tc_events post. */
 function ans_tb_update_event( $req ) {
     $id = (int) $req['id'];
     if ( get_post_type( $id ) !== 'tc_events' ) {
@@ -620,7 +620,7 @@ function ans_tb_update_event( $req ) {
      * Report submitted keys this endpoint does not consume.
      *
      * Without this the handler returns HTTP 200 and a full, healthy-looking payload
-     * after writing nothing â€” a caller cannot distinguish "applied" from "silently
+     * after writing nothing — a caller cannot distinguish "applied" from "silently
      * dropped" except by diffing the response by eye. That cost a real session on
      * 2026-08-11: the write was sent as 'event_date_time' (the key the READ payload
      * returns) rather than 'date' (the key this endpoint accepts), and the resulting
@@ -635,7 +635,7 @@ function ans_tb_update_event( $req ) {
     $ignored = array_values( array_diff( array_keys( $p ), $known ) );
     if ( $ignored ) {
         $payload['ignored_fields'] = $ignored;
-        $payload['warning']        = 'Not written â€” this endpoint does not accept: '
+        $payload['warning']        = 'Not written — this endpoint does not accept: '
             . implode( ', ', $ignored )
             . '. Note the read/write asymmetry: the payload returns event_date_time and'
             . ' event_location, but writes take date and location.';
@@ -644,7 +644,7 @@ function ans_tb_update_event( $req ) {
     return $payload;
 }
 
-/** DELETE /tickera/event/{id} â€” trash (default) or permanently delete with force=1. */
+/** DELETE /tickera/event/{id} — trash (default) or permanently delete with force=1. */
 function ans_tb_delete_event( $req ) {
     $id = (int) $req['id'];
     if ( get_post_type( $id ) !== 'tc_events' ) {
@@ -660,7 +660,7 @@ function ans_tb_delete_event( $req ) {
 }
 
 /* -------------------------------------------------------------------------
- * [ans_season_events] â€” a date-stacked list of performances.
+ * [ans_season_events] — a date-stacked list of performances.
  *
  * Reads tc_events, sorts ascending by event_date_time, and renders one row per
  * performance grouped under month headings.
@@ -680,10 +680,10 @@ function ans_tb_delete_event( $req ) {
  *                       public performance listing.
  *
  * Public visitors only ever see published events. Editors see drafts marked
- * "DRAFT â€” not public" so the page can be previewed before launch.
+ * "DRAFT — not public" so the page can be previewed before launch.
  *
  * Naming convention it relies on (no extra data entry needed):
- *   "<Project Name> â€” <date>, <venue> (<FLAG>)"
+ *   "<Project Name> — <date>, <venue> (<FLAG>)"
  * Everything before the em dash becomes the public title and is matched against
  * a page of the same name to build the link. A trailing (PENDING),
  * (PLACEHOLDER...), (TBC) or (FREE) becomes the row's note. The
@@ -697,7 +697,7 @@ function ans_se_clean_title( $raw ) {
     $t = html_entity_decode( (string) $raw, ENT_QUOTES, 'UTF-8' );
     // Byte-safe: every separator starts with an ASCII space, so the byte offset
     // is always on a character boundary. Avoids an mbstring dependency.
-    foreach ( array( ' â€” ', ' â€“ ', ' - ' ) as $sep ) {
+    foreach ( array( ' — ', ' – ', ' - ' ) as $sep ) {
         $pos = strpos( $t, $sep );
         if ( false !== $pos ) {
             $t = substr( $t, 0, $pos );
@@ -906,7 +906,7 @@ function ans_se_render( $atts ) {
             $out .= '<span class="ans-se__note">' . esc_html( $r['note'] ) . '</span>';
         }
         if ( $r['draft'] ) {
-            $out .= '<span class="ans-se__note ans-se__note--draft">Draft â€” not public</span>';
+            $out .= '<span class="ans-se__note ans-se__note--draft">Draft — not public</span>';
         }
         $out .= '</div>';
 
@@ -921,7 +921,7 @@ function ans_se_render( $atts ) {
 }
 
 /* -------------------------------------------------------------------------
- * [ans_season_projects] â€” the season's PROJECTS in order, not its performances.
+ * [ans_season_projects] — the season's PROJECTS in order, not its performances.
  *
  * A "project" is a program (Rivers & Streams, Darkness & Light...). Its
  * individual performances belong underneath it. This groups the tc_events by
@@ -929,7 +929,7 @@ function ans_se_render( $atts ) {
  * one block per project: date range, project name, how many performances and in
  * which cities, the project's blurb, and a button through to its page.
  *
- * The blurb is the linked page's EXCERPT â€” so Kim can edit it in the normal
+ * The blurb is the linked page's EXCERPT — so Kim can edit it in the normal
  * WordPress place with no shortcode knowledge. The thumbnail is that page's
  * featured image, if one is set.
  *
@@ -955,28 +955,28 @@ function ans_sp_place( $location ) {
     if ( '' === $loc ) {
         return '';
     }
-    // "â€¦, Boulder, CO 80303" -> "Boulder"
+    // "…, Boulder, CO 80303" -> "Boulder"
     if ( preg_match( '/,\s*([^,]+?),\s*[A-Z]{2}\s*\d{5}/', $loc, $m ) ) {
         return trim( $m[1] );
     }
-    // Otherwise take the leading name: "Savoy, Denver â€” PLACEHOLDERâ€¦" -> "Savoy"
+    // Otherwise take the leading name: "Savoy, Denver — PLACEHOLDER…" -> "Savoy"
     $first = explode( ',', $loc );
-    $first = explode( ' â€” ', $first[0] );
+    $first = explode( ' — ', $first[0] );
     return trim( $first[0] );
 }
 
-/** "October 9â€“11, 2026" / "September 12, 2026" / "Dec 6, 2026 â€“ Jan 5, 2027" */
+/** "October 9–11, 2026" / "September 12, 2026" / "Dec 6, 2026 – Jan 5, 2027" */
 function ans_sp_date_range( $first, $last ) {
     if ( $first === $last ) {
         return wp_date( 'F j, Y', $first );
     }
     if ( wp_date( 'Y', $first ) === wp_date( 'Y', $last ) ) {
         if ( wp_date( 'm', $first ) === wp_date( 'm', $last ) ) {
-            return wp_date( 'F j', $first ) . 'â€“' . wp_date( 'j, Y', $last );
+            return wp_date( 'F j', $first ) . '–' . wp_date( 'j, Y', $last );
         }
-        return wp_date( 'F j', $first ) . ' â€“ ' . wp_date( 'F j, Y', $last );
+        return wp_date( 'F j', $first ) . ' – ' . wp_date( 'F j, Y', $last );
     }
-    return wp_date( 'F j, Y', $first ) . ' â€“ ' . wp_date( 'F j, Y', $last );
+    return wp_date( 'F j, Y', $first ) . ' – ' . wp_date( 'F j, Y', $last );
 }
 
 function ans_sp_styles() {
@@ -1064,7 +1064,7 @@ function ans_sp_render( $atts ) {
         }
 
         // A project is a Tickera Event Category. That is the real, editable
-        // structure â€” Events > Categories in wp-admin. Only if an event has not
+        // structure — Events > Categories in wp-admin. Only if an event has not
         // been categorised do we fall back to reading the project name out of
         // the event title.
         $term = ans_sp_event_term( $po->ID );
@@ -1165,7 +1165,7 @@ function ans_sp_render( $atts ) {
         if ( ! empty( $p['places'] ) ) {
             $bits[] = implode( ', ', $p['places'] );
         }
-        $out .= '<p class="ans-sp__meta">' . esc_html( implode( ' Â· ', $bits ) ) . '</p>';
+        $out .= '<p class="ans-sp__meta">' . esc_html( implode( ' · ', $bits ) ) . '</p>';
 
         // Blurb: the Event Category's description first (Events > Categories),
         // then the project page's excerpt. Both are ordinary WordPress fields,
@@ -1184,7 +1184,7 @@ function ans_sp_render( $atts ) {
             $out .= '<span class="ans-sp__note">' . esc_html( $note ) . '</span>';
         }
         if ( $p['draft'] ) {
-            $out .= '<span class="ans-sp__note ans-sp__note--draft">Draft â€” not public</span>';
+            $out .= '<span class="ans-sp__note ans-sp__note--draft">Draft — not public</span>';
         }
 
         if ( $href ) {
@@ -1197,7 +1197,7 @@ function ans_sp_render( $atts ) {
 }
 
 /* ============================================================================
- * v1.3.0 â€” projects are Tickera Event Categories
+ * v1.3.0 — projects are Tickera Event Categories
  *
  * Tickera registers an `event_category` taxonomy on tc_events. That is exactly
  * the "project" concept: a program that several performances belong to. It has
@@ -1228,7 +1228,7 @@ function ans_sp_event_term( $event_id ) {
  * One-time backfill: give every uncategorised event a category derived from its
  * title, so the existing season groups correctly without 17 manual edits.
  *
- * Idempotent and non-destructive â€” it never touches an event that already has a
+ * Idempotent and non-destructive — it never touches an event that already has a
  * category, so anything reassigned by hand in wp-admin stays reassigned. Safe to
  * delete this function once the season is categorised.
  */
@@ -1245,7 +1245,7 @@ function ans_tb_backfill_event_categories() {
     foreach ( $posts as $po ) {
         $existing = wp_get_object_terms( $po->ID, 'event_category', array( 'fields' => 'ids' ) );
         if ( is_wp_error( $existing ) || ! empty( $existing ) ) {
-            continue; // already categorised â€” leave it alone
+            continue; // already categorised — leave it alone
         }
         $name = ans_se_clean_title( $po->post_title );
         if ( '' === $name ) {
@@ -1290,7 +1290,7 @@ add_filter( 'ans_se_display_title', function ( $title, $event_id ) {
 }, 10, 2 );
 
 /* ============================================================================
- * v1.4.0 â€” full Tickera management surface
+ * v1.4.0 — full Tickera management surface
  *
  * Everything below exists so this system can be operated by command instead of
  * by hand in wp-admin. Endpoints are admin-only and namespaced under
@@ -1428,7 +1428,7 @@ function ans_tb_introspect( $req ) {
         }
     }
 
-    // Distinct meta keys actually in use on ticket products â€” the real answer
+    // Distinct meta keys actually in use on ticket products — the real answer
     // to "what does a working ticket product look like".
     global $wpdb;
     $ticket_meta_keys = $wpdb->get_col(
@@ -1521,7 +1521,7 @@ function ans_tb_get_ticket_type( $req ) {
     return ans_tb_ticket_type_payload( $id );
 }
 
-/** POST /tickera/ticket-type/{id} â€” update a ticket-type product. */
+/** POST /tickera/ticket-type/{id} — update a ticket-type product. */
 function ans_tb_update_ticket_type( $req ) {
     $id = (int) $req['id'];
     if ( 'product' !== get_post_type( $id ) || ! function_exists( 'wc_get_product' ) ) {
@@ -1621,7 +1621,7 @@ function ans_tb_assign_template( $req ) {
 
     // v1.8.1: match BOTH meta conventions. repair-tickets deletes the legacy
     // `_ticket` / `event_name` keys, so searching only those found nothing on
-    // any repaired product â€” half of why this route was marked broken.
+    // any repaired product — half of why this route was marked broken.
     $meta = array(
         'relation' => 'AND',
         array(
@@ -1651,7 +1651,7 @@ function ans_tb_assign_template( $req ) {
     foreach ( get_posts( $args ) as $po ) {
         // v1.8.1: write the key the Ticket DESIGNER actually reads. This route
         // previously wrote `ticket_template`, which repair-tickets deletes as
-        // stale â€” so assignment silently did nothing and tickets printed blank.
+        // stale — so assignment silently did nothing and tickets printed blank.
         update_post_meta( $po->ID, 'tc_designer_template_id', $template_id );
         if ( isset( $p['legacy_template'] ) ) {
             update_post_meta( $po->ID, '_ticket_template', (int) $p['legacy_template'] );
@@ -1843,11 +1843,11 @@ function ans_tb_list_attendees( $req ) {
 }
 
 /* ============================================================================
- * v1.5.0 â€” targeted content find-and-replace
+ * v1.5.0 — targeted content find-and-replace
  *
  * Built because fixing one wrong shortcode across seven concert pages would
  * otherwise mean reading and rewriting every page in full. This does an exact,
- * literal string replacement on named posts only â€” no regex, no site-wide
+ * literal string replacement on named posts only — no regex, no site-wide
  * sweep, no "replace everywhere" mode. dry_run defaults to TRUE so the first
  * call always reports what WOULD change.
  * ========================================================================== */
@@ -1865,7 +1865,7 @@ add_action( 'rest_api_init', function () {
     ) );
 } );
 
-/** GET /content/find?needle=...&post_type=page â€” which posts contain a literal string. */
+/** GET /content/find?needle=...&post_type=page — which posts contain a literal string. */
 function ans_tb_content_find( $req ) {
     global $wpdb;
     $needle = (string) $req->get_param( 'needle' );
@@ -1904,7 +1904,7 @@ function ans_tb_content_find( $req ) {
  * POST /content/replace
  * Body: { post_ids: [1,2], search: "...", replace: "...", dry_run: true }
  *
- * Exact literal replacement. post_ids is REQUIRED â€” there is deliberately no
+ * Exact literal replacement. post_ids is REQUIRED — there is deliberately no
  * way to run this across everything.
  */
 function ans_tb_content_replace( $req ) {
@@ -1917,7 +1917,7 @@ function ans_tb_content_replace( $req ) {
         return new WP_Error( 'missing_search', 'search is required.', array( 'status' => 400 ) );
     }
     if ( empty( $p['post_ids'] ) || ! is_array( $p['post_ids'] ) ) {
-        return new WP_Error( 'missing_post_ids', 'post_ids is required â€” this endpoint will not run site-wide.', array( 'status' => 400 ) );
+        return new WP_Error( 'missing_post_ids', 'post_ids is required — this endpoint will not run site-wide.', array( 'status' => 400 ) );
     }
 
     $results = array();
@@ -1964,7 +1964,7 @@ function ans_tb_content_replace( $req ) {
 }
 
 /* ============================================================================
- * v1.6.0 â€” CORRECT Tickera 3.6 ticket meta
+ * v1.6.0 — CORRECT Tickera 3.6 ticket meta
  *
  * Ground truth, captured 2026-07-31 from a ticket product created through the
  * WooCommerce admin UI (post 6716). These are the exact keys and default values
@@ -2099,7 +2099,7 @@ function ans_tb_repair_tickets( $req ) {
 }
 
 /* ============================================================================
- * v1.7.0 â€” bulk ticket-tier creation
+ * v1.7.0 — bulk ticket-tier creation
  *
  * A 13-performance season with three tiers each is ~39 products. One call.
  * Idempotent on SKU: if a product with the same SKU already exists it is
@@ -2188,7 +2188,7 @@ function ans_tb_bulk_ticket_types( $req ) {
         if ( $sku && ! $existing ) {
             try {
                 $product->set_sku( $sku );
-            } catch ( Exception $e ) { /* duplicate SKU â€” ignore */ }
+            } catch ( Exception $e ) { /* duplicate SKU — ignore */ }
         }
         if ( array_key_exists( 'stock', $it ) && '' !== $it['stock'] && null !== $it['stock'] ) {
             $product->set_manage_stock( true );
