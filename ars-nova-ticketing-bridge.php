@@ -2330,3 +2330,10 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/order-email-preview.php';
  * the confirmation email, falling back to event_location everywhere else.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/event-private-location.php';
+
+/**
+ * The ticket PDF and the frozen order line print the PRIVATE venue address when
+ * the event carries one. Loaded after event-private-location.php because it
+ * uses ANS_PRIVATE_LOCATION_META.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/private-location-ticket.php';

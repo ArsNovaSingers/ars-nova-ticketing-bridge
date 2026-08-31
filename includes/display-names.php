@@ -316,10 +316,11 @@ add_action( 'woocommerce_checkout_create_order_line_item', 'ans_dn_freeze_line_i
  *
  * Renders exactly what a customer would see for a product, without buying it.
  *
- * This exists because there is no safe test gateway on either environment -
- * Stripe is in live mode on staging as well as production, so "just place a
- * test order" would charge a real card. Verification has to be possible without
- * a purchase, or it does not happen.
+ * This exists so a customer-facing string can be checked without placing an
+ * order at all, which is the cheap path and the one to reach for first.
+ *
+ * No claim about any environment's payment mode is recorded here. Query the
+ * gateway when that matters; a comment cannot stay true about it.
  *
  * Omit product_id to preview every ticket product at once.
  */
