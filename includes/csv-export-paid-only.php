@@ -29,35 +29,48 @@
  *      in, and the per-row test at `:510` short-circuits on `'any'`. Result:
  *      57 rows, not 36.
  *
- *   2. The dropdown cannot be used to fix it. `class.fields.php:67` offers only
- *      Tickera-native values (`order_paid`, `order_cancelled`, …), while in
- *      Bridge mode the value compared at `:510` is the WooCommerce status
- *      (`class.resource.php:229` sets it from `$wc_order->get_status()`, i.e.
- *      `completed`). Nothing but "Any" matches anything, so selecting "Paid"
- *      produces an EMPTY export. There is no correct setting to tell staff to
- *      choose.
+ *   2. Nobody has to get that setting wrong for the export to be wrong — it is
+ *      wrong when left alone, which is the state every fresh export screen
+ *      starts in.
  *
- * That second point is why this lives here rather than in a settings change:
- * it is a plugin bug, and `csv-export` is third-party code that a Tickera
- * update would overwrite. Both fixes below are additive hooks on our side.
+ * ⚠️ CORRECTED 2026-09-07, same session, before this shipped to LIVE. An earlier
+ * version of this file claimed the dropdown could not express a working value:
+ * that `class.fields.php:67` offers only Tickera-native names (`order_paid`,
+ * `order_cancelled`, …) while `:510` compares a WooCommerce status, so nothing
+ * but "Any" could ever match. **That is false.**
+ * `bridge-for-woocommerce.php:434` already replaces the whole option list via
+ * this same `tc_csv_payment_statuses` filter (`modify_csv_payment_statuses()`,
+ * `:3028`) with `any / wc-completed / wc-processing / wc-on-hold / wc-cancelled
+ * / wc-pending / wc-refunded`. Picking "Completed" by hand always worked.
+ *
+ * The claim was drawn from reading `csv-export` on its own and never checking
+ * who else hooked the same filter — the same mistake this branch made about
+ * Checkinera an hour earlier, where the validation lived in a different plugin
+ * entirely. It was caught by running the code on staging and noticing the
+ * dropdown returned options this file had not written.
+ *
+ * So the fix is narrower than first described, and this file no longer touches
+ * the dropdown at all: the bridge's list is already correct and a filter of ours
+ * at the same priority would be silently discarded. What remains — and what is
+ * worth fixing in code rather than in a setting — is that the DEFAULT is unsafe,
+ * `csv-export` is third-party code a Tickera update would overwrite, and a door
+ * list should not depend on a human remembering a dropdown.
  *
  * ── What this does ─────────────────────────────────────────────────────────
  *
- * 1. Rewrites the dropdown to the WooCommerce statuses that actually match, so
- *    a deliberate choice works. Someone auditing voided tickets can still pick
- *    Cancelled or Refunded and get them.
+ * Intercepts the export at priority 0 — before `csv-export`'s own handler at the
+ * default 10 — and replaces an absent, empty or "Any" selection with the paid
+ * statuses. `$_POST` is what the add-on reads (`index.php:410`), so this is the
+ * only place it can be corrected.
  *
- * 2. Intercepts the export at priority 0 — before `csv-export`'s own handler at
- *    the default 10 — and replaces an absent, empty or "Any" selection with the
- *    paid statuses. An explicit non-"Any" choice is left alone, so the audit
- *    path above still works. `$_POST` is what the add-on reads
- *    (`index.php:410`), so this is the only place it can be corrected.
+ * An explicit non-"Any" choice is left alone, so someone auditing voided tickets
+ * can still pick Cancelled or Refunded from the bridge's dropdown and get them.
  *
  * Verify after any Tickera update: an export for event 6643 must return the
  * paid count, not the paid count plus the voided ones.
  *
  * @package ArsNovaTicketingBridge
- * @since   1.20.0
+ * @since   1.20.0 (dropdown filter removed in 1.20.1 — see correction above)
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -78,23 +91,6 @@ function ans_csv_paid_order_statuses() {
         'ans_csv_export_paid_statuses',
         [ 'wc-completed', 'wc-processing', 'order_paid' ]
     );
-}
-
-/**
- * Replace the export screen's order-status options with values that match what
- * the add-on actually compares against in Bridge mode.
- */
-add_filter( 'tc_csv_payment_statuses', 'ans_csv_export_status_options' );
-function ans_csv_export_status_options( $statuses ) {
-    return [
-        'wc-completed'  => __( 'Completed (paid)', 'ans-tb' ),
-        'wc-processing' => __( 'Processing (paid)', 'ans-tb' ),
-        'wc-refunded'   => __( 'Refunded (ticket voided)', 'ans-tb' ),
-        'wc-cancelled'  => __( 'Cancelled (ticket voided)', 'ans-tb' ),
-        'wc-failed'     => __( 'Failed payment', 'ans-tb' ),
-        'wc-pending'    => __( 'Pending payment', 'ans-tb' ),
-        'any'           => __( 'Any — includes unpaid and voided tickets', 'ans-tb' ),
-    ];
 }
 
 /**
