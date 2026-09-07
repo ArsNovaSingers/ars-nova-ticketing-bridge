@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Ars Nova Ticketing Bridge
  * Description: Admin-only REST endpoints that let the Ars Nova WordPress MCP connector create & list Tickera events and Bridge ticket-type products by command. Writes the same post/meta the Tickera + WooCommerce Bridge admin UI writes. DEV automation helper.
- * Version: 1.19.0
+ * Version: 1.20.0
  * Author: Ars Nova (Jonathan Raabe) + Claude
  * Requires at least: 5.8
  * Requires PHP: 7.4
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ANS_TB_VERSION', '1.19.0' );
+define( 'ANS_TB_VERSION', '1.20.0' );
 define( 'ANS_TB_NS', 'ars-nova/v1' );
 
 /** Permission gate: admin only (connector authenticates as an admin app-password user). */
@@ -2337,3 +2337,14 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/event-private-location.php'
  * uses ANS_PRIVATE_LOCATION_META.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/private-location-ticket.php';
+
+/**
+ * The Tickera CSV attendee export is the only surface that still lists tickets
+ * from cancelled and refunded orders — the door scanner, the in-app attendee
+ * list and the PDF export all discard them. Its order-status filter defaults to
+ * "Any", which deliberately re-includes trashed instances, and no value in its
+ * dropdown matches a WooCommerce status in Bridge mode, so there is no correct
+ * setting a human could pick. Measured 2026-09-07: 57 rows for a 50-seat room
+ * where 36 seats were sold.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/csv-export-paid-only.php';
