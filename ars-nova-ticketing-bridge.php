@@ -2417,3 +2417,14 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/private-location-ticket.php
  * where 36 seats were sold.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/csv-export-paid-only.php';
+
+/**
+ * This site has two page systems for one concert: the designed concert page
+ * under /this-season/, and Tickera's generated /tc-events/ page carrying the
+ * event post's own (often stale) featured image. The generated one was public,
+ * had an archive, and had 23 URLs in the sitemap competing with seven real
+ * pages. A comp-ticket email on 2026-09-11 linked a buyer straight into it.
+ * This makes the concert page the canonical destination for every link to an
+ * event, and 301s the generated URLs that are already in the wild.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/event-canonical-url.php';
