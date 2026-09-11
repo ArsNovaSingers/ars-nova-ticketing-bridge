@@ -1563,14 +1563,31 @@ function ans_tb_update_ticket_type( $req ) {
     $prod->save();
 
     // Tickera / Bridge wiring.
+    // These two wrote the BARE key names until v1.21.0 - `event_name` and
+    // `ticket_template` rather than `_event_name` and `tc_designer_template_id`.
+    // Tickera 3.6 reads only the underscore-prefixed forms, which is the exact
+    // mistake ans_tb_write_ticket_meta() carries a standing warning about: it is
+    // what once made every ticket this plugin created invisible to Tickera, and
+    // produced the empty ticket table, "Unknown ticket ID" and the USD0 price.
+    // The create path was fixed in v1.6.0. The update path was not, so re-pointing
+    // a ticket at another event returned HTTP 200 and left it on the old event.
     if ( isset( $p['event_id'] ) ) {
         $eid = (int) $p['event_id'];
         if ( $eid && 'tc_events' === get_post_type( $eid ) ) {
-            update_post_meta( $id, 'event_name', $eid );
+            update_post_meta( $id, '_event_name', $eid );
         }
     }
     if ( isset( $p['ticket_template'] ) ) {
-        update_post_meta( $id, 'ticket_template', (int) $p['ticket_template'] );
+        update_post_meta( $id, 'tc_designer_template_id', (int) $p['ticket_template'] );
+    }
+    if ( isset( $p['legacy_template'] ) ) {
+        update_post_meta( $id, '_ticket_template', (int) $p['legacy_template'] );
+    }
+    if ( isset( $p['downloadable'] ) ) {
+        update_post_meta( $id, '_downloadable', $p['downloadable'] ? 'yes' : 'no' );
+    }
+    if ( isset( $p['ans_tier'] ) && '' !== $p['ans_tier'] ) {
+        update_post_meta( $id, '_ans_tier', sanitize_key( (string) $p['ans_tier'] ) );
     }
     if ( isset( $p['ticket_availability'] ) ) {
         update_post_meta( $id, '_ticket_availability', sanitize_text_field( $p['ticket_availability'] ) );
@@ -1586,7 +1603,34 @@ function ans_tb_update_ticket_type( $req ) {
     }
     update_post_meta( $id, '_ticket', 'yes' );
 
-    return ans_tb_ticket_type_payload( $id );
+    $payload = ans_tb_ticket_type_payload( $id );
+
+    /*
+     * Report submitted keys this endpoint does not consume.
+     *
+     * The event update handler has carried this guard since 2026-08-11, with a
+     * comment explaining that a 200 plus a healthy-looking payload after writing
+     * nothing is indistinguishable from success. The lesson was written down in
+     * one handler and never carried to its neighbour, and on 2026-09-10 this
+     * handler cost the identical hour: `downloadable` and `_ans_tier` were POSTed
+     * here, accepted, dropped, and reported as a clean 200. The defect was caught
+     * only by re-reading the product through WooCommerce afterwards.
+     */
+    $known = array(
+        'id', 'name', 'price', 'status', 'virtual', 'stock',
+        'description', 'short_description',
+        'event_id', 'ticket_template', 'legacy_template', 'ticket_availability',
+        'downloadable', 'ans_tier', 'meta',
+    );
+    $ignored = array_values( array_diff( array_keys( $p ), $known ) );
+    if ( $ignored ) {
+        $payload['ignored_fields'] = $ignored;
+        $payload['warning']        = 'Not written - this endpoint does not accept: '
+            . implode( ', ', $ignored )
+            . '. Anything else Tickera stores can go through the `meta` object.';
+    }
+
+    return $payload;
 }
 
 /** DELETE /tickera/ticket-type/{id} */
@@ -1998,6 +2042,31 @@ function ans_tb_write_ticket_meta( $product_id, $event_id, $template = 0, $p = a
 
     update_post_meta( $product_id, '_tc_is_ticket', 'yes' );
     update_post_meta( $product_id, '_event_name', $event_id );
+
+    // Ticket PDFs are delivered as WooCommerce downloads, and that is what lets a
+    // ticket order auto-complete instead of parking at `processing` for ever.
+    // Virtual alone is NOT enough - includes/ticket-downloads.php only attaches the
+    // PDF to a product WooCommerce already considers downloadable, and as that file
+    // says, neither half works alone.
+    //
+    // This endpoint did not write the flag at all until v1.21.0, so every ticket it
+    // created was born unable to complete an order. Two were found that way on
+    // 2026-09-10: product 7850 (a published, buyable $35 livestream ticket) and
+    // product 7194, the free Nova Circle reservation for the Sept 24 members' event,
+    // which would have failed for every member the day it was published. Every ticket
+    // product created any other way already carried _downloadable = yes, which is why
+    // the gap stayed invisible - the historic data was clean and only new rows were
+    // wrong. Defaults to yes for the same reason _virtual defaults to true, and is
+    // overridable for the same reason.
+    $downloadable = array_key_exists( 'downloadable', $p ) ? (bool) $p['downloadable'] : true;
+    update_post_meta( $product_id, '_downloadable', $downloadable ? 'yes' : 'no' );
+
+    // Tier drives the label and the sort order in the event tickets block. An EMPTY
+    // value is not neutral there: ans_et_rows() reads `$tier ? $tier : 'adult'`, so a
+    // tier-less product silently renders AS AN ADULT TICKET rather than as blank.
+    if ( isset( $p['ans_tier'] ) && '' !== $p['ans_tier'] ) {
+        update_post_meta( $product_id, '_ans_tier', sanitize_key( (string) $p['ans_tier'] ) );
+    }
 
     // Two separate template fields. tc_designer_template_id binds to the new
     // Ticket Designer; _ticket_template is the legacy one. 0 means "default".

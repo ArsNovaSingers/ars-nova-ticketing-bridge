@@ -51,6 +51,11 @@ function ans_et_tiers() {
 			'student' => array( 'label' => 'Student',            'order' => 20 ),
 			'youth'   => array( 'label' => 'Youth (18 & under)', 'order' => 30 ),
 			'free'    => array( 'label' => 'Free admission',     'order' => 40 ),
+			// Livestream is a real tier, not an in-person one, so it sorts last.
+			// Without this entry ans_et_rows() falls through to the product's full
+			// name for the label, printing 'Rivers & Streams - Oct 10, Livestream'
+			// where the row should just read 'Livestream'.
+			'livestream' => array( 'label' => 'Livestream',      'order' => 50 ),
 		)
 	);
 }
