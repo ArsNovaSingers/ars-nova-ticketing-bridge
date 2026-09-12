@@ -2453,3 +2453,13 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/next-event-block.php';
  * and so a reminder can never be mistaken for a receipt.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/email-event-reminder.php';
+
+/**
+ * v1.25.0 - per-event reminder configuration and the scheduler.
+ *
+ * Copy and schedule live on the EVENT, falling back to the global email
+ * settings, falling back to code defaults - so one template serves the season
+ * and any single performance can override any field. Every send is recorded
+ * per order, per offset, which is what makes a retry safe.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/reminder-schedule.php';
