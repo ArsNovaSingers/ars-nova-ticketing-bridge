@@ -97,6 +97,11 @@ function ans_tb_reminder_parse_offsets( $raw ) {
  * existed. `sources` reports which layer answered, because "why does this
  * event say something different" is the question people actually ask.
  *
+ * Directions, parking and the note are on a SEPARATE chain - event -> venue,
+ * with no global layer - and are returned in `logistics`, each with its own
+ * source. See ans_tb_reminder_logistics() for why there is no global layer and
+ * why the venue's internal notes field is not one of the keys it reads.
+ *
  * @param int $event_id
  * @return array
  */
@@ -140,13 +145,39 @@ function ans_tb_reminder_config( $event_id ) {
 	$enabled_raw = get_post_meta( $event_id, $keys['enabled'], true );
 	$enabled     = ( '' === trim( (string) $enabled_raw ) ) ? false : (bool) intval( $enabled_raw );
 
+	/*
+	 * Directions, parking and the note resolve on their own chain - event, then
+	 * venue - so they are reported separately rather than folded into `copy`.
+	 * Folding them in would have been tidier and wrong: `copy` resolves through
+	 * the global WooCommerce email settings, and there is no such thing as a
+	 * site-wide default parking paragraph. Two different chains, two blocks.
+	 *
+	 * Guarded because email-event-reminder.php is a sibling include: if it is
+	 * ever loaded conditionally, reporting no logistics beats a fatal error in
+	 * a read-only endpoint.
+	 */
+	$logistics = array();
+	$venue_id  = 0;
+	if ( function_exists( 'ans_tb_reminder_logistics' ) ) {
+		$logistics = ans_tb_reminder_logistics( $event_id );
+		foreach ( $logistics as $field => $row ) {
+			$sources[ $field ] = $row['source'];
+		}
+	}
+	if ( function_exists( 'ans_tb_reminder_event_venue_id' ) ) {
+		$venue_id = ans_tb_reminder_event_venue_id( $event_id );
+	}
+
 	return array(
-		'event_id' => $event_id,
-		'enabled'  => $enabled,
-		'offsets'  => $offsets,
-		'video'    => trim( (string) get_post_meta( $event_id, $keys['video'], true ) ),
-		'copy'     => $resolved,
-		'sources'  => $sources,
+		'event_id'   => $event_id,
+		'enabled'    => $enabled,
+		'offsets'    => $offsets,
+		'video'      => trim( (string) get_post_meta( $event_id, $keys['video'], true ) ),
+		'copy'       => $resolved,
+		'venue_id'   => $venue_id,
+		'venue_name' => $venue_id ? get_the_title( $venue_id ) : '',
+		'logistics'  => $logistics,
+		'sources'    => $sources,
 	);
 }
 
@@ -606,7 +637,7 @@ add_action( 'rest_api_init', function () {
 				$cfg['title']    = html_entity_decode( get_the_title( $id ), ENT_QUOTES, 'UTF-8' );
 				$cfg['days_out'] = ans_tb_reminder_days_out( $id );
 				$cfg['orders']   = count( ans_tb_reminder_event_order_ids( $id ) );
-				$cfg['note']     = 'copy fields resolve event -> global email settings -> code default; "sources" says which answered.';
+				$cfg['note']     = 'copy fields resolve event -> global email settings -> code default. directions/parking/note resolve event -> venue, with no global layer. "sources" says which answered for every field.';
 				return $cfg;
 			},
 		),
@@ -640,6 +671,36 @@ add_action( 'rest_api_init', function () {
 						delete_post_meta( $id, $keys[ $f ] );   // empty means inherit, not blank
 					} else {
 						update_post_meta( $id, $keys[ $f ], $v );
+					}
+					$written[] = $f;
+				}
+
+				/*
+				 * Per-event logistics overrides. These were documented as
+				 * accepted in the Concert Reminder SOP from the day it was
+				 * written and were NOT implemented - a POST carrying
+				 * {"parking": "..."} returned 200 and silently wrote nothing,
+				 * which is the worst available outcome: the caller is told the
+				 * request succeeded and the concert goes out with no parking.
+				 *
+				 * Empty means INHERIT (fall through to the venue), exactly as an
+				 * empty copy field means inherit from the global settings, so an
+				 * override is deleted rather than stored as ''.
+				 */
+				foreach ( array(
+					'directions' => 'ans_directions',
+					'parking'    => 'ans_parking',
+					'note'       => 'ans_note',
+				) as $f => $meta_key ) {
+					$v = $req->get_param( $f );
+					if ( null === $v ) {
+						continue;
+					}
+					$v = trim( (string) $v );
+					if ( '' === $v ) {
+						delete_post_meta( $id, $meta_key );
+					} else {
+						update_post_meta( $id, $meta_key, sanitize_textarea_field( $v ) );
 					}
 					$written[] = $f;
 				}

@@ -609,17 +609,112 @@ function ans_tb_reminder_richtext( $text, $plain = false ) {
 }
 
 /**
- * Per-event logistics: directions and parking, read from the EVENT.
+ * The venue post linked to an event, or 0.
+ *
+ * Read by META KEY, deliberately, rather than by calling ANSP_Event_Venue.
+ * The bridge has no dependency on the singers portal today and must not grow
+ * one here: ticketing takes real money, and it cannot start failing because
+ * somebody deactivated a members-area plugin. The key is the contract.
+ *
+ * @param int $event_id
+ * @return int
+ */
+function ans_tb_reminder_event_venue_id( $event_id ) {
+	$venue_id = (int) get_post_meta( (int) $event_id, 'ansp_event_venue', true );
+	if ( $venue_id <= 0 ) {
+		return 0;
+	}
+	$post = get_post( $venue_id );
+	if ( ! $post || 'ans_venue' !== $post->post_type || 'publish' !== $post->post_status ) {
+		return 0;
+	}
+	return $venue_id;
+}
+
+/**
+ * Directions, parking and the "good to know" note, with the layer that answered.
+ *
+ * Resolution is EVENT -> VENUE, and the venue half is the point: parking is a
+ * property of the room. It changes when the church repaves its lot, not when we
+ * programme a different concert, so a three-night run should need it typed once
+ * and a second production at the same address should inherit it. The event layer
+ * remains because one night genuinely can differ - a side door locked for a
+ * private event, a lot closed for resurfacing.
+ *
+ * There is deliberately NO global layer. A site-wide default parking paragraph
+ * would be wrong at every venue but one, and a plausible-looking wrong answer is
+ * worse here than an absent one: an empty section is visible, a stale one is not.
+ *
+ * The venue's own `ansp_venue_notes` is NOT read and must never be wired in.
+ * Every live venue record uses it as a staff audit trail - capacity provenance,
+ * booking phone numbers, open questions addressed to Kim by name. One of them
+ * reads "Capacity 0 = NOT RECORDED, deliberately... ASK KIM". It is one mapping
+ * line away from a concert reminder and it must stay that way. "Good to know"
+ * resolves from the EVENT only.
+ *
+ * @param int $event_id
+ * @return array field => array( 'value' => string, 'source' => 'event'|'venue'|'none' )
+ */
+function ans_tb_reminder_logistics( $event_id ) {
+	$event_id = (int) $event_id;
+	$venue_id = ans_tb_reminder_event_venue_id( $event_id );
+
+	// field => array( event meta key, venue meta key or '' for event-only ).
+	$map = apply_filters(
+		'ans_tb_reminder_logistics_map',
+		array(
+			'directions' => array( 'ans_directions', 'ansp_venue_directions' ),
+			'parking'    => array( 'ans_parking', 'ansp_venue_parking' ),
+			'note'       => array( 'ans_note', '' ),
+		),
+		$event_id,
+		$venue_id
+	);
+
+	$out = array();
+	foreach ( $map as $field => $keys ) {
+		$event_key = isset( $keys[0] ) ? (string) $keys[0] : '';
+		$venue_key = isset( $keys[1] ) ? (string) $keys[1] : '';
+
+		$value = $event_key ? trim( (string) get_post_meta( $event_id, $event_key, true ) ) : '';
+		if ( '' !== $value ) {
+			$out[ $field ] = array( 'value' => $value, 'source' => 'event' );
+			continue;
+		}
+
+		if ( $venue_id && '' !== $venue_key ) {
+			$value = trim( (string) get_post_meta( $venue_id, $venue_key, true ) );
+			if ( '' !== $value ) {
+				$out[ $field ] = array( 'value' => $value, 'source' => 'venue' );
+				continue;
+			}
+		}
+
+		$out[ $field ] = array( 'value' => '', 'source' => 'none' );
+	}
+
+	return $out;
+}
+
+/**
+ * Per-event logistics, resolved by ans_tb_reminder_logistics(): event, then venue.
  *
  * These used to live in `_purchase_note` on the ticket product, which is the
  * wrong home twice over: a concert with three nights shares one product, so the
  * text cannot differ per performance, and a product field is invisible to
- * Singers Hub. Reading them from the event is the first step of moving that
- * ownership; the order email still uses the purchase note until the rest lands.
+ * Singers Hub. The event owns any per-night exception; the venue owns the
+ * ordinary case, so the same parking paragraph is typed once per room rather
+ * than once per performance.
  *
- * Renders nothing when the event carries neither field, rather than falling
- * back to the purchase note - a silent fallback would hide the migration being
+ * Renders nothing when neither layer carries a field, rather than falling back
+ * to the purchase note - a silent fallback would hide the migration being
  * incomplete, and an empty section is easier to notice than a stale one.
+ *
+ * NOTE the filter changed shape in 1.26.0. It is now field => heading
+ * ('directions' => 'Getting there'), not heading => meta key. The meta keys it
+ * used to carry now live in ans_tb_reminder_logistics()'s own filter, because
+ * one field can be answered by either of two keys and a single map could no
+ * longer express that.
  *
  * @param WC_Order $order
  * @param bool     $plain
@@ -635,15 +730,17 @@ function ans_tb_reminder_event_sections( $order, $plain = false ) {
 	}
 	$event_id = (int) $events[0]['id'];
 
-	$map = apply_filters( 'ans_tb_reminder_event_sections_map', array(
-		'Getting there' => 'ans_directions',
-		'Parking'       => 'ans_parking',
-		'Good to know'  => 'ans_note',
+	$logistics = ans_tb_reminder_logistics( $event_id );
+
+	$headings = apply_filters( 'ans_tb_reminder_event_sections_map', array(
+		'directions' => 'Getting there',
+		'parking'    => 'Parking',
+		'note'       => 'Good to know',
 	), $event_id );
 
 	$out = '';
-	foreach ( $map as $heading => $meta_key ) {
-		$value = trim( (string) get_post_meta( $event_id, $meta_key, true ) );
+	foreach ( $headings as $field => $heading ) {
+		$value = isset( $logistics[ $field ]['value'] ) ? $logistics[ $field ]['value'] : '';
 		if ( '' === $value ) {
 			continue;
 		}
