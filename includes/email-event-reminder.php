@@ -19,7 +19,11 @@
  *     woocommerce_email_before_order_table action, by opting this email id
  *     into ans_tb_email_carries_ticket();
  *   - the ticket PDF attachments, gated by that same filter;
- *   - the order table, via the standard woocommerce_email_order_details action.
+ *
+ * It deliberately does NOT render the order table. woocommerce_email_order_details
+ * brings prices, subtotal, total, payment method and the billing address with it,
+ * which is how the first build ended up looking like a second charge. A reminder
+ * shows the event and the ticket, never the transaction.
  *
  * One thing it cannot reuse. bridge-for-woocommerce renders the "Tickets:"
  * table on woocommerce_email_after_order_table, but gates it on a hard-coded
