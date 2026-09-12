@@ -186,6 +186,46 @@ function ans_tb_register_reminder_email( $emails ) {
 		}
 
 		/**
+		 * Fill the subject/heading placeholders from the order's first event.
+		 *
+		 * PUBLIC, and it has to be: this is called from trigger() and from the
+		 * order/{id}/email-preview diagnostic route, which deliberately never
+		 * calls trigger(). WP_Hook and outside callers reach class methods via
+		 * call_user_func_array, so a private method here is a fatal TypeError at
+		 * runtime that `php -l` cannot see - v1.24.0 shipped exactly that bug and
+		 * 500'd on staging. If you narrow this, you will reintroduce it.
+		 *
+		 * Extracted from trigger() in 1.26.1 because the preview route rendered
+		 * the subject as "Reminder:  is " - the default template with every
+		 * placeholder empty - while the real send was correct. A diagnostic that
+		 * misreports the subject line is worse than no diagnostic: it invites
+		 * somebody to "fix" a subject that was never broken.
+		 *
+		 * @param WC_Order $order
+		 * @return void
+		 */
+		public function populate_placeholders( $order ) {
+			if ( ! is_object( $order ) ) {
+				return;
+			}
+			$order_id = (int) $order->get_id();
+
+			$events = function_exists( 'ans_tb_order_events' ) ? ans_tb_order_events( $order_id ) : array();
+			$first  = $events ? $events[0] : array();
+			$ts     = 0;
+			if ( ! empty( $first['id'] ) && function_exists( 'ans_tb_event_ts' ) ) {
+				$ts = (int) ans_tb_event_ts( (int) $first['id'] );
+			}
+
+			$this->placeholders['{event_title}']  = isset( $first['title'] ) ? $first['title'] : '';
+			$this->placeholders['{event_date}']   = $ts ? wp_date( 'l, F j', $ts ) : '';
+			$this->placeholders['{event_time}']   = $ts ? wp_date( 'g:i a', $ts ) : '';
+			$this->placeholders['{days_until}']   = ans_tb_days_until_phrase( $ts );
+			$this->placeholders['{order_number}'] = $order->get_order_number();
+			$this->placeholders['{first_name}']   = $order->get_billing_first_name();
+		}
+
+		/**
 		 * Populate placeholders and send to the customer on the order.
 		 *
 		 * Returns false rather than throwing when the order is missing, not
@@ -214,19 +254,7 @@ function ans_tb_register_reminder_email( $emails ) {
 			}
 			$this->recipient = $order->get_billing_email();
 
-			$events = function_exists( 'ans_tb_order_events' ) ? ans_tb_order_events( (int) $order_id ) : array();
-			$first  = $events ? $events[0] : array();
-			$ts     = 0;
-			if ( ! empty( $first['id'] ) && function_exists( 'ans_tb_event_ts' ) ) {
-				$ts = (int) ans_tb_event_ts( (int) $first['id'] );
-			}
-
-			$this->placeholders['{event_title}']  = isset( $first['title'] ) ? $first['title'] : '';
-			$this->placeholders['{event_date}']   = $ts ? wp_date( 'l, F j', $ts ) : '';
-			$this->placeholders['{event_time}']   = $ts ? wp_date( 'g:i a', $ts ) : '';
-			$this->placeholders['{days_until}']   = ans_tb_days_until_phrase( $ts );
-			$this->placeholders['{order_number}'] = $order->get_order_number();
-			$this->placeholders['{first_name}']   = $order->get_billing_first_name();
+			$this->populate_placeholders( $order );
 
 			$ok = false;
 			if ( $this->is_enabled() && $this->get_recipient() ) {
