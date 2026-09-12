@@ -151,6 +151,31 @@ function ans_tb_reminder_config( $event_id ) {
 }
 
 /* -------------------------------------------------------------------------
+ * Environment guard
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Is this the production site?
+ *
+ * Staging on this project is a CLONE. It carries real orders with real patron
+ * email addresses, and it inherited Live's mail credentials - so a scheduler
+ * running there does not send test mail, it sends real mail to real people who
+ * are not expecting it. Nothing about a hostname makes that obvious, which is
+ * why PROJECT_RULES section 3a already says `siteurl` is the only acceptable
+ * proof of which environment you are on. The same rule applies to code.
+ *
+ * Found the hard way on 2026-09-11: the scheduler was verified on staging by
+ * enabling a real event, and that left a clone one cron tick away from mailing
+ * eleven patrons.
+ *
+ * @return bool
+ */
+function ans_tb_reminder_is_live() {
+	$live = apply_filters( 'ans_tb_reminder_live_url', 'https://arsnovasingers.org' );
+	return untrailingslashit( (string) get_option( 'siteurl' ) ) === untrailingslashit( (string) $live );
+}
+
+/* -------------------------------------------------------------------------
  * The record of what was sent
  * ---------------------------------------------------------------------- */
 
@@ -375,6 +400,16 @@ function ans_tb_reminder_run_event( $event_id, $offset = -1, $dry_run = true, $f
 	$event_id = (int) $event_id;
 	$offset   = (int) $offset;
 
+	if ( ! $dry_run && ! ans_tb_reminder_is_live() && ! apply_filters( 'ans_tb_reminder_allow_non_production', false ) ) {
+		return array(
+			'event_id' => $event_id,
+			'offset'   => $offset,
+			'refused'  => true,
+			'reason'   => 'Not the production site (' . get_option( 'siteurl' ) . '). Real sends are refused on a clone, '
+				. 'which holds real patron addresses and inherited live mail credentials.',
+		);
+	}
+
 	$orders  = ans_tb_reminder_event_order_ids( $event_id );
 	$results = array();
 	$sent    = 0;
@@ -497,7 +532,15 @@ function ans_tb_reminder_schedule_overview() {
  * @param bool $dry_run
  * @return array
  */
-function ans_tb_reminder_tick( $dry_run = false ) {
+function ans_tb_reminder_tick( $dry_run = false, $allow_non_production = false ) {
+	if ( ! $dry_run && ! ans_tb_reminder_is_live() && ! $allow_non_production ) {
+		return array(
+			'ran_at'  => current_time( 'mysql' ),
+			'refused' => true,
+			'reason'  => 'Not the production site (' . get_option( 'siteurl' ) . '). This is a clone holding real patron '
+				. 'addresses, so a real send is refused. Pass allow_non_production to override, or use dry_run.',
+		);
+	}
 	$ran = array();
 	foreach ( ans_tb_reminder_schedule_overview() as $row ) {
 		if ( empty( $row['due_today'] ) ) {
@@ -526,6 +569,14 @@ add_action( 'ans_tb_reminder_daily', 'ans_tb_reminder_tick' );
  * schedule can be driven externally without changing any of this.
  */
 function ans_tb_reminder_schedule_cron() {
+	if ( ! ans_tb_reminder_is_live() ) {
+		/* A clone must never carry this schedule. Clear it if a clone picked one
+		   up before this guard existed, or inherited one in a database copy. */
+		if ( wp_next_scheduled( 'ans_tb_reminder_daily' ) ) {
+			wp_clear_scheduled_hook( 'ans_tb_reminder_daily' );
+		}
+		return;
+	}
 	if ( wp_next_scheduled( 'ans_tb_reminder_daily' ) ) {
 		return;
 	}
@@ -642,7 +693,12 @@ add_action( 'rest_api_init', function () {
 		'permission_callback' => 'ans_tb_perm',
 		'callback'            => function () {
 			return array(
-				'now'         => current_time( 'mysql' ),
+				'now'           => current_time( 'mysql' ),
+				'siteurl'       => get_option( 'siteurl' ),
+				'is_production' => ans_tb_reminder_is_live(),
+				'env_note'      => ans_tb_reminder_is_live()
+					? 'Production. Real sends will run.'
+					: 'NOT production - a clone. Real sends and the cron schedule are refused here.',
 				'cron_next'   => wp_next_scheduled( 'ans_tb_reminder_daily' )
 					? wp_date( 'Y-m-d H:i', wp_next_scheduled( 'ans_tb_reminder_daily' ) )
 					: null,
