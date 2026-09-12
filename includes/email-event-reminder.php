@@ -236,8 +236,12 @@ function ans_tb_register_reminder_email( $emails ) {
 		 * ans_tb_email_event_block() opens with "Your ticket is attached to this
 		 * email as a PDF" - true, but it reads like a receipt. The filter is
 		 * added and removed around our own render so no other email is affected.
+		 *
+		 * PUBLIC, and it has to be: WP_Hook calls this through call_user_func_array
+		 * from outside the class, so a private method is a fatal TypeError the
+		 * moment the email renders. Caught on staging, which is the point of staging.
 		 */
-		private function reminder_lead( $lead ) {
+		public function reminder_lead( $lead ) {
 			return 'Here are the details for your concert. Your ticket is attached to this email as a PDF - '
 				. 'print it or show it on your phone.';
 		}
