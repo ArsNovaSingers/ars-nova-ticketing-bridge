@@ -2428,3 +2428,19 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/csv-export-paid-only.php';
  * event, and 301s the generated URLs that are already in the wild.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/event-canonical-url.php';
+
+/**
+ * The home page's second position: whatever concert is actually next.
+ *
+ * That slot is the one a first-time visitor is guaranteed to see, and until now
+ * it held hand-typed prose — so it was also the slot most likely to be stale,
+ * because keeping it current was a manual job nobody owned. [ans_next_event]
+ * reads the season out of Tickera and renders the next project on its own, so
+ * the job disappears rather than moving to someone else.
+ *
+ * It groups by event_category rather than resolving to a single tc_events post,
+ * because a concert here is a run of nights: resolving to one date would
+ * advertise Rivers & Streams three separate times across October and hide two
+ * thirds of the run each time.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/next-event-block.php';
