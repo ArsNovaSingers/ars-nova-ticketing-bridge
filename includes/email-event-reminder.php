@@ -156,6 +156,15 @@ function ans_tb_register_reminder_email( $emails ) {
 			foreach ( $fields as $key => $field ) {
 				$after[ $key ] = $field;
 				if ( 'heading' === $key ) {
+					$after['lead'] = array(
+						'title'       => 'Ticket-block sentence',
+						'type'        => 'textarea',
+						'desc_tip'    => true,
+						'description' => 'The line inside the navy ticket box, above the date and venue.',
+						'placeholder' => $this->get_default_lead(),
+						'default'     => $this->get_default_lead(),
+						'css'         => 'width:400px; height:60px;',
+					);
 					$after['intro'] = array(
 						'title'       => 'Opening paragraph',
 						'type'        => 'textarea',
@@ -241,25 +250,26 @@ function ans_tb_register_reminder_email( $emails ) {
 		 * from outside the class, so a private method is a fatal TypeError the
 		 * moment the email renders. Caught on staging, which is the point of staging.
 		 */
+		public function get_default_lead() {
+			return 'Your ticket is attached to this email as a PDF. You do not need to print it — '
+				. 'we will have a guest list at the door.';
+		}
+
 		public function reminder_lead( $lead ) {
-			return 'Here are the details for your concert. Your ticket is attached to this email as a PDF - '
-				. 'print it or show it on your phone.';
+			return $this->format_string( $this->get_option( 'lead', $this->get_default_lead() ) );
 		}
 
 		public function get_content_html() {
 			add_filter( 'ans_tb_email_lead_text', array( $this, 'reminder_lead' ), 20 );
 			ob_start();
 			do_action( 'woocommerce_email_header', $this->get_heading(), $this );
-			echo wpautop( wptexturize( $this->get_intro() ) );
-			do_action( 'woocommerce_email_order_details', $this->object, false, false, $this );
+			echo ans_tb_reminder_richtext( $this->get_intro(), false );
+			do_action( 'woocommerce_email_before_order_table', $this->object, false, false, $this );
+			echo ans_tb_reminder_event_sections( $this->object, false );
 			if ( apply_filters( 'ans_tb_reminder_render_tickets_table', true, $this->object ) ) {
 				echo ans_tb_reminder_tickets_table( $this->object, false );
 			}
-			do_action( 'woocommerce_email_order_meta', $this->object, false, false, $this );
-			do_action( 'woocommerce_email_customer_details', $this->object, false, false, $this );
-			if ( $this->get_additional_content() ) {
-				echo wpautop( wptexturize( $this->get_additional_content() ) );
-			}
+			echo ans_tb_reminder_richtext( $this->get_additional_content(), false );
 			do_action( 'woocommerce_email_footer', $this );
 			$out = ob_get_clean();
 			remove_filter( 'ans_tb_email_lead_text', array( $this, 'reminder_lead' ), 20 );
@@ -270,16 +280,13 @@ function ans_tb_register_reminder_email( $emails ) {
 			add_filter( 'ans_tb_email_lead_text', array( $this, 'reminder_lead' ), 20 );
 			ob_start();
 			echo strtoupper( $this->get_heading() ) . "\n\n";
-			echo $this->get_intro() . "\n\n";
-			do_action( 'woocommerce_email_order_details', $this->object, false, true, $this );
+			echo ans_tb_reminder_richtext( $this->get_intro(), true );
+			do_action( 'woocommerce_email_before_order_table', $this->object, false, true, $this );
+			echo ans_tb_reminder_event_sections( $this->object, true );
 			if ( apply_filters( 'ans_tb_reminder_render_tickets_table', true, $this->object ) ) {
 				echo ans_tb_reminder_tickets_table( $this->object, true );
 			}
-			do_action( 'woocommerce_email_order_meta', $this->object, false, true, $this );
-			do_action( 'woocommerce_email_customer_details', $this->object, false, true, $this );
-			if ( $this->get_additional_content() ) {
-				echo "\n" . $this->get_additional_content() . "\n";
-			}
+			echo ans_tb_reminder_richtext( $this->get_additional_content(), true );
 			echo "\n" . wp_strip_all_tags( wptexturize( get_option( 'woocommerce_email_footer_text' ) ) );
 			$out = ob_get_clean();
 			remove_filter( 'ans_tb_email_lead_text', array( $this, 'reminder_lead' ), 20 );
@@ -529,3 +536,97 @@ add_action( 'rest_api_init', function () {
 		},
 	) );
 } );
+
+/**
+ * Render staff-editable copy without making staff write HTML.
+ *
+ * Blank lines separate blocks. A block beginning "## " is a heading; anything
+ * else is a paragraph. That is the whole syntax, and it exists because the
+ * first build shipped Kim's section titles - "What to expect", "About Nicolò" -
+ * through wpautop(), which rendered them as orphan sentences indistinguishable
+ * from body copy. Headings have to survive the trip from a settings textarea.
+ *
+ * @param string $text
+ * @param bool   $plain
+ * @return string
+ */
+function ans_tb_reminder_richtext( $text, $plain = false ) {
+	$text = trim( (string) $text );
+	if ( '' === $text ) {
+		return '';
+	}
+	$blocks = preg_split( "/\n\s*\n/", str_replace( "\r\n", "\n", $text ) );
+	$out    = '';
+
+	foreach ( $blocks as $block ) {
+		$block = trim( $block );
+		if ( '' === $block ) {
+			continue;
+		}
+		$is_heading = ( 0 === strpos( $block, '## ' ) );
+		$body       = $is_heading ? trim( substr( $block, 3 ) ) : $block;
+
+		if ( $plain ) {
+			$out .= $is_heading
+				? "\n" . strtoupper( wp_strip_all_tags( $body ) ) . "\n"
+				: wp_strip_all_tags( $body ) . "\n\n";
+			continue;
+		}
+
+		if ( $is_heading ) {
+			$out .= '<h2 style="margin:24px 0 8px;font-size:18px;font-weight:normal;'
+				. 'font-family:Helvetica,Arial,sans-serif;color:#1f3d5c;">'
+				. esc_html( $body ) . '</h2>';
+		} else {
+			$out .= '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;'
+				. 'font-family:Helvetica,Arial,sans-serif;color:#222;">'
+				. nl2br( wptexturize( wp_kses_post( $body ) ) ) . '</p>';
+		}
+	}
+
+	return $out;
+}
+
+/**
+ * Per-event logistics: directions and parking, read from the EVENT.
+ *
+ * These used to live in `_purchase_note` on the ticket product, which is the
+ * wrong home twice over: a concert with three nights shares one product, so the
+ * text cannot differ per performance, and a product field is invisible to
+ * Singers Hub. Reading them from the event is the first step of moving that
+ * ownership; the order email still uses the purchase note until the rest lands.
+ *
+ * Renders nothing when the event carries neither field, rather than falling
+ * back to the purchase note - a silent fallback would hide the migration being
+ * incomplete, and an empty section is easier to notice than a stale one.
+ *
+ * @param WC_Order $order
+ * @param bool     $plain
+ * @return string
+ */
+function ans_tb_reminder_event_sections( $order, $plain = false ) {
+	if ( ! is_object( $order ) || ! function_exists( 'ans_tb_order_events' ) ) {
+		return '';
+	}
+	$events = ans_tb_order_events( (int) $order->get_id() );
+	if ( ! $events || empty( $events[0]['id'] ) ) {
+		return '';
+	}
+	$event_id = (int) $events[0]['id'];
+
+	$map = apply_filters( 'ans_tb_reminder_event_sections_map', array(
+		'Getting there' => 'ans_directions',
+		'Parking'       => 'ans_parking',
+		'Good to know'  => 'ans_note',
+	), $event_id );
+
+	$out = '';
+	foreach ( $map as $heading => $meta_key ) {
+		$value = trim( (string) get_post_meta( $event_id, $meta_key, true ) );
+		if ( '' === $value ) {
+			continue;
+		}
+		$out .= ans_tb_reminder_richtext( '## ' . $heading . "\n\n" . $value, $plain );
+	}
+	return $out;
+}
