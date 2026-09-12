@@ -412,7 +412,7 @@ function ans_tb_send_reminder( $order_id, $divert_to = '' ) {
 		remove_filter( 'woocommerce_email_subject_ans_event_reminder', $subj_cb, 999 );
 	}
 
-	return array(
+	$result = array(
 		'order_id'  => (int) $order_id,
 		'sent'      => (bool) $sent,
 		'to'        => $divert_to ? $divert_to : $order->get_billing_email(),
@@ -420,6 +420,23 @@ function ans_tb_send_reminder( $order_id, $divert_to = '' ) {
 		'sendable'  => ans_tb_reminder_order_is_sendable( $order ),
 		'status'    => $order->get_status(),
 	);
+
+	/**
+	 * Fires after every reminder attempt, preview or real.
+	 *
+	 * reminder-schedule.php listens here to record what was sent, which is what
+	 * makes a retry safe. On 2026-09-11 a batch send timed out at the connector
+	 * while PHP carried on, and nothing in the system could answer whether it
+	 * had gone - the SMTP log was the only witness. This is the choke point
+	 * every send passes through, so it is the honest place to record.
+	 *
+	 * @param int    $order_id
+	 * @param string $divert_to Non-empty for a preview.
+	 * @param array  $result
+	 */
+	do_action( 'ans_tb_reminder_sent', (int) $order_id, $divert_to, $result );
+
+	return $result;
 }
 
 add_action( 'rest_api_init', function () {
