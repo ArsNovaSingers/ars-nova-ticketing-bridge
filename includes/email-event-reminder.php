@@ -269,10 +269,10 @@ function ans_tb_register_reminder_email( $emails ) {
 			do_action( 'woocommerce_email_header', $this->get_heading(), $this );
 			echo ans_tb_reminder_richtext( $this->get_intro(), false );
 			do_action( 'woocommerce_email_before_order_table', $this->object, false, false, $this );
-			echo ans_tb_reminder_event_sections( $this->object, false );
 			if ( apply_filters( 'ans_tb_reminder_render_tickets_table', true, $this->object ) ) {
 				echo ans_tb_reminder_tickets_table( $this->object, false );
 			}
+			echo ans_tb_reminder_event_sections( $this->object, false );
 			echo ans_tb_reminder_richtext( $this->get_additional_content(), false );
 			do_action( 'woocommerce_email_footer', $this );
 			$out = ob_get_clean();
@@ -286,10 +286,10 @@ function ans_tb_register_reminder_email( $emails ) {
 			echo strtoupper( $this->get_heading() ) . "\n\n";
 			echo ans_tb_reminder_richtext( $this->get_intro(), true );
 			do_action( 'woocommerce_email_before_order_table', $this->object, false, true, $this );
-			echo ans_tb_reminder_event_sections( $this->object, true );
 			if ( apply_filters( 'ans_tb_reminder_render_tickets_table', true, $this->object ) ) {
 				echo ans_tb_reminder_tickets_table( $this->object, true );
 			}
+			echo ans_tb_reminder_event_sections( $this->object, true );
 			echo ans_tb_reminder_richtext( $this->get_additional_content(), true );
 			echo "\n" . wp_strip_all_tags( wptexturize( get_option( 'woocommerce_email_footer_text' ) ) );
 			$out = ob_get_clean();
