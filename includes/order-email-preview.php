@@ -95,6 +95,26 @@ function ans_tb_render_order_email( $order_id, $email_id = 'customer_completed_o
 		);
 	}
 
+	/*
+	 * An email class that fills its own placeholders gets to do so. WC_Email
+	 * populates most of them inside trigger(), which this route deliberately
+	 * never calls - so anything an email computes for itself (our reminder
+	 * derives {event_title} and {days_until} from the order's linked event) was
+	 * simply absent, and the subject rendered as the default template with every
+	 * token blank: "Reminder:  is ".
+	 *
+	 * Discovered 2026-09-12 while verifying the venue chain. The real send was
+	 * correct throughout; only this diagnostic lied. A diagnostic that
+	 * misreports the subject is worse than none - it invites somebody to fix a
+	 * subject that was never broken.
+	 *
+	 * method_exists rather than a class check, so any future email can opt in by
+	 * offering the same method.
+	 */
+	if ( method_exists( $email, 'populate_placeholders' ) ) {
+		$email->populate_placeholders( $order );
+	}
+
 	$subject = '';
 	$html    = '';
 	try {
