@@ -150,8 +150,28 @@ function ans_tb_thanks_next_event( $after_event_id ) {
 		'suppress_filters' => true,
 	) );
 
-	$best    = null;
-	$best_ts = 0;
+	/*
+	 * Everything belonging to the production they just attended is excluded,
+	 * not merely the single performance.
+	 *
+	 * Found on staging before this shipped: for a Rivers & Streams Oct 9 order
+	 * the "coming up next" block proudly advertised "Rivers & Streams - Oct 10,
+	 * Livestream". Chronologically correct and editorially absurd - it invites
+	 * somebody who was in the room last night to buy a ticket to watch the same
+	 * concert on a screen.
+	 *
+	 * event_category is the right discriminator because it is what already
+	 * groups performances into a production: the livestream duplicate, the
+	 * second night and the matinee all share it. Filtering on the "Livestream"
+	 * location string instead would have fixed the symptom, missed the second
+	 * night entirely, and broken the day a production is livestream-only.
+	 */
+	$own_terms = wp_get_object_terms( $after_event_id, 'event_category', array( 'fields' => 'ids' ) );
+	$own_terms = is_wp_error( $own_terms ) ? array() : array_map( 'intval', $own_terms );
+
+	$best      = null;
+	$best_ts   = 0;
+	$best_live = true;
 	foreach ( $ids as $id ) {
 		$id = (int) $id;
 		if ( $id === $after_event_id ) {
@@ -160,13 +180,29 @@ function ans_tb_thanks_next_event( $after_event_id ) {
 		if ( '1' === (string) get_post_meta( $id, 'ans_hide', true ) ) {
 			continue;
 		}
+		if ( $own_terms ) {
+			$terms = wp_get_object_terms( $id, 'event_category', array( 'fields' => 'ids' ) );
+			$terms = is_wp_error( $terms ) ? array() : array_map( 'intval', $terms );
+			if ( array_intersect( $own_terms, $terms ) ) {
+				continue;
+			}
+		}
 		$ts = (int) ans_tb_event_ts( $id );
 		if ( $ts <= $from ) {
 			continue;
 		}
-		if ( ! $best_ts || $ts < $best_ts ) {
-			$best_ts = $ts;
-			$best    = $id;
+
+		/*
+		 * Tie-break away from a livestream. When the next production opens with
+		 * an in-person night and a stream on the same day, the person we are
+		 * writing to just sat in a room - offer them the room.
+		 */
+		$is_live = ( 0 === strcasecmp( 'Livestream', trim( (string) get_post_meta( $id, 'event_location', true ) ) ) );
+
+		if ( ! $best_ts || $ts < $best_ts || ( $ts === $best_ts && $best_live && ! $is_live ) ) {
+			$best_ts   = $ts;
+			$best      = $id;
+			$best_live = $is_live;
 		}
 	}
 	return $best ? ans_tb_event_details( $best ) : null;
@@ -329,6 +365,17 @@ add_filter( 'woocommerce_email_classes', function ( $emails ) {
 				$this->template_html  = 'emails/customer-processing-order.php';
 				$this->template_plain = 'emails/plain/customer-processing-order.php';
 
+				/*
+				 * MUST be set. WC_Email::get_email_type() falls back to 'plain'
+				 * when $email_type is null, and init_form_fields() below replaces
+				 * WooCommerce's own field list - which is where the email_type
+				 * setting normally comes from. Without this the whole email,
+				 * photo strip included, rendered as plain text on staging: an
+				 * email built around photographs, delivered with no photographs
+				 * and no styling, and nothing anywhere reporting an error.
+				 */
+				$this->email_type = 'html';
+
 				$this->placeholders = array(
 					'{event_title}' => '',
 					'{event_date}'  => '',
@@ -385,13 +432,21 @@ add_filter( 'woocommerce_email_classes', function ( $emails ) {
 						'default'     => '',
 						'css'         => 'width:400px; height:80px;',
 					),
-					'closing' => array(
+					'closing'    => array(
 						'title'       => 'Sign-off',
 						'type'        => 'textarea',
 						'description' => 'Appears after the next-concert block and before the unsubscribe line.',
 						'placeholder' => $this->get_default_closing(),
 						'default'     => '',
 						'css'         => 'width:400px; height:80px;',
+					),
+					'email_type' => array(
+						'title'       => 'Email type',
+						'type'        => 'select',
+						'description' => 'Leave as HTML. This email is built around photographs; plain text drops every one of them.',
+						'default'     => 'html',
+						'class'       => 'email_type wc-enhanced-select',
+						'options'     => $this->get_email_type_options(),
 					),
 				);
 			}
@@ -411,6 +466,20 @@ add_filter( 'woocommerce_email_classes', function ( $emails ) {
 			public function populate_placeholders( $order, $event_id = 0 ) {
 				if ( ! is_object( $order ) ) {
 					return;
+				}
+				/*
+				 * Resolve the event ourselves when the caller did not name one.
+				 * order/{id}/email-preview calls this with the order alone, and
+				 * without this the subject rendered "Thank you for being there -"
+				 * with the title silently empty. That is the identical shape of
+				 * the bug fixed in 1.26.1 ("Reminder:  is "), caught here before
+				 * shipping rather than after, by rendering the email and reading
+				 * the subject line instead of trusting a 200.
+				 */
+				$event_id = (int) $event_id;
+				if ( ! $event_id ) {
+					$this->object = $order;
+					$event_id     = $this->ans_resolve_event_id();
 				}
 				$ts = $event_id && function_exists( 'ans_tb_event_ts' ) ? (int) ans_tb_event_ts( $event_id ) : 0;
 
@@ -512,7 +581,8 @@ add_filter( 'woocommerce_email_classes', function ( $emails ) {
 				echo ans_tb_thanks_unsub_footer( $this->get_recipient(), $plain );
 
 				if ( $plain ) {
-					echo "\n" . wp_strip_all_tags( wptexturize( get_option( 'woocommerce_email_footer_text' ) ) );
+					// format_string, or {site_title} and {store_address} print literally.
+					echo "\n" . wp_strip_all_tags( wptexturize( $this->format_string( get_option( 'woocommerce_email_footer_text' ) ) ) );
 				} else {
 					do_action( 'woocommerce_email_footer', $this );
 				}
