@@ -2463,3 +2463,12 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/email-event-reminder.php';
  * per order, per offset, which is what makes a retry safe.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/reminder-schedule.php';
+
+/**
+ * Marketing opt-out. Loaded BEFORE the post-concert email that depends on it,
+ * so the gate can never be missing while the email needing it is present.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/marketing-optout.php';
+
+/** The post-concert thank-you - the first MARKETING email this plugin sends. */
+require_once plugin_dir_path( __FILE__ ) . 'includes/email-post-concert.php';
