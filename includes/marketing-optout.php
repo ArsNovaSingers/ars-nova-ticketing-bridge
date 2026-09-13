@@ -120,14 +120,38 @@ function ans_tb_set_optout( $email, $opted_out = true ) {
 	return true;
 }
 
-/** The unsubscribe URL for one address. */
+/**
+ * The unsubscribe URL for one address.
+ *
+ * Points at admin-post.php, NOT at the home page.
+ *
+ * The first cut used home_url() with query args, and on staging it did nothing
+ * at all: Kinsta's full-page cache answered the request from the edge and PHP
+ * never ran. The visitor got a perfectly normal home page, `init` never fired,
+ * and the opt-out was never recorded. Verified by clicking the link and then
+ * re-reading the flag - still opted in.
+ *
+ * That is the worst failure available to this feature. A broken unsubscribe
+ * link is not neutral: the person believes they have opted out, receives the
+ * next email anyway, and reports it as spam - which costs the sending domain
+ * far more than the one address ever would.
+ *
+ * admin-post.php is WordPress's own endpoint for exactly this - a front-end
+ * action performed by a logged-out visitor - and no page cache caches
+ * /wp-admin/. It needs no rewrite rule and no published page, so there is
+ * nothing an editor can accidentally delete.
+ *
+ * @param string $email
+ * @return string
+ */
 function ans_tb_optout_link( $email ) {
 	return add_query_arg(
 		array(
-			'ans_optout' => rawurlencode( ans_tb_optout_normalise( $email ) ),
-			't'          => ans_tb_optout_token( $email ),
+			'action' => 'ans_tb_optout',
+			'e'      => rawurlencode( ans_tb_optout_normalise( $email ) ),
+			't'      => ans_tb_optout_token( $email ),
 		),
-		home_url( '/' )
+		admin_url( 'admin-post.php' )
 	);
 }
 
@@ -143,10 +167,16 @@ function ans_tb_resubscribe_link( $email ) {
  * and cannot be broken by somebody tidying the page tree.
  */
 function ans_tb_optout_handle_request() {
-	if ( ! isset( $_GET['ans_optout'] ) || ! isset( $_GET['t'] ) ) {
+	$raw = null;
+	if ( isset( $_GET['e'] ) ) {
+		$raw = $_GET['e'];                 // admin-post.php - the link we send
+	} elseif ( isset( $_GET['ans_optout'] ) ) {
+		$raw = $_GET['ans_optout'];        // legacy home_url() shape, kept so an
+	}                                      // already-sent link is never dead
+	if ( null === $raw || ! isset( $_GET['t'] ) ) {
 		return;
 	}
-	$email = ans_tb_optout_normalise( wp_unslash( $_GET['ans_optout'] ) );
+	$email = ans_tb_optout_normalise( wp_unslash( $raw ) );
 	$token = (string) wp_unslash( $_GET['t'] );
 
 	if ( ! $email || ! is_email( $email ) || ! hash_equals( ans_tb_optout_token( $email ), $token ) ) {
@@ -175,6 +205,17 @@ function ans_tb_optout_handle_request() {
 		array( 'response' => 200, 'back_link' => false )
 	);
 }
+/*
+ * Registered on admin-post.php for BOTH logged-out and logged-in visitors -
+ * _nopriv alone would fail for the one person most likely to test the link,
+ * a signed-in administrator, and fail in the direction that looks like it
+ * worked.
+ *
+ * `init` is kept as a fallback for the legacy home_url() link shape. It is a
+ * no-op on any request that carries neither parameter.
+ */
+add_action( 'admin_post_nopriv_ans_tb_optout', 'ans_tb_optout_handle_request' );
+add_action( 'admin_post_ans_tb_optout', 'ans_tb_optout_handle_request' );
 add_action( 'init', 'ans_tb_optout_handle_request' );
 
 /**
