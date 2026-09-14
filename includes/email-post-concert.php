@@ -1874,6 +1874,7 @@ function ans_tb_thanks_run_event( $event_id, $slot = null, $dry_run = true, $for
 	$would     = array();
 	$skipped   = array();
 	$sent      = array();
+	$seen_recipients = array();
 
 	foreach ( $order_ids as $oid ) {
 		$order = wc_get_order( $oid );
@@ -1907,6 +1908,36 @@ function ans_tb_thanks_run_event( $event_id, $slot = null, $dry_run = true, $for
 			$skipped[] = array( 'order_id' => $oid, 'to' => $to, 'reason' => 'opted_out' );
 			continue;
 		}
+		/* One human, one email. Idempotency is per ORDER, which is the right
+		   question for "has this order been thanked" and the wrong one for "has
+		   this PERSON been thanked". The Sept 12 house concert had 30 orders and
+		   29 addresses, because one patron bought twice; without this they would
+		   receive two identical thank-yous in the same minute, which is the kind
+		   of small sloppiness an audience notices. Deduplicate on the normalised
+		   address within this run, and still write the per-order key for the
+		   skipped order so a later run cannot mistake it for unsent. This applies
+		   under $force too: force exists to bypass the due-ness and idempotency
+		   guards, never to mail one person twice. */
+		$norm = strtolower( trim( (string) $to ) );
+		if ( '' !== $norm && isset( $seen_recipients[ $norm ] ) ) {
+			$skipped[] = array(
+				'order_id' => $oid,
+				'to'       => $to,
+				'reason'   => 'duplicate_recipient',
+				'slot'     => $slot,
+				'note'     => 'Already included in this run as order ' . $seen_recipients[ $norm ] . '.',
+			);
+			if ( ! $dry_run ) {
+				update_post_meta(
+					$oid,
+					ans_tb_thanks_sent_key( $event_id, $slot ),
+					current_time( 'mysql' ) . ' (duplicate recipient; mailed via order ' . $seen_recipients[ $norm ] . ')'
+				);
+			}
+			continue;
+		}
+		$seen_recipients[ $norm ] = $oid;
+
 		if ( $dry_run ) {
 			$would[] = array( 'order_id' => $oid, 'to' => $to );
 			continue;
