@@ -2472,3 +2472,10 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/marketing-optout.php';
 
 /** The post-concert thank-you - the first MARKETING email this plugin sends. */
 require_once plugin_dir_path( __FILE__ ) . 'includes/email-post-concert.php';
+
+/**
+ * No-store cache headers for this plugin's whole REST namespace. Kinsta's edge
+ * was caught serving a stale reminder/schedule board - a diagnostic reporting
+ * what is due right now must never be answered from cache.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/rest-no-store.php';
