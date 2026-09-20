@@ -297,3 +297,141 @@
 		padding: 16px 20px;
 	}
 }
+
+/* ------------------------------------------------------------------
+ * Sold out, and the way out of it. Added 1.29.0.
+ *
+ * Kadence paints every bare <button> white and wins on specificity, so
+ * every button below sets color explicitly AND repeats it on hover,
+ * focus and active — the trap recorded in the portal HANDOFF.
+ * ------------------------------------------------------------------ */
+
+.ans-et__date.is-full {
+	opacity: .78;
+}
+
+.ans-et__date.is-full .ans-et__date-flag {
+	background: #b32d2e;
+	color: #fff;
+}
+
+/* A finished tier: present, legible, and carrying no control at all. */
+.ans-et__row.is-soldout {
+	opacity: .65;
+}
+
+.ans-et__row.is-soldout .ans-et__row-price {
+	text-decoration: line-through;
+}
+
+.ans-et__row-gone {
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	font-size: .78rem;
+	color: #b32d2e;
+	white-space: nowrap;
+}
+
+/* The escape hatch. */
+.ans-et__request {
+	margin-top: 1.4rem;
+	padding-top: 1.2rem;
+	border-top: 1px solid rgba(0, 0, 0, .12);
+}
+
+.ans-et__request-lead {
+	margin: 0 0 .8rem;
+	font-size: .95rem;
+	line-height: 1.5;
+}
+
+.ans-et__request-open,
+.ans-et__request-send {
+	background: #14304d;
+	color: #fff;
+	border: 1px solid #14304d;
+	border-radius: 3px;
+	padding: .6rem 1.1rem;
+	font: inherit;
+	font-size: .95rem;
+	cursor: pointer;
+}
+
+.ans-et__request-open:hover,
+.ans-et__request-open:focus,
+.ans-et__request-open:active,
+.ans-et__request-send:hover,
+.ans-et__request-send:focus,
+.ans-et__request-send:active {
+	background: #0e2237;
+	color: #fff;
+	border-color: #0e2237;
+}
+
+.ans-et__request-form {
+	margin-top: 1rem;
+	display: grid;
+	gap: .7rem;
+	max-width: 27rem;
+}
+
+.ans-et__request-note {
+	margin: 0;
+	font-size: .88rem;
+	line-height: 1.5;
+	opacity: .8;
+}
+
+.ans-et__request-form label {
+	display: block;
+	font-size: .85rem;
+	font-weight: 600;
+}
+
+.ans-et__request-form label span {
+	font-weight: 400;
+	opacity: .65;
+}
+
+.ans-et__request-form input,
+.ans-et__request-form textarea {
+	display: block;
+	width: 100%;
+	margin-top: .25rem;
+	padding: .5rem .6rem;
+	font: inherit;
+	font-size: .95rem;
+	border: 1px solid rgba(0, 0, 0, .28);
+	border-radius: 3px;
+	box-sizing: border-box; /* portal.css declares this nowhere; do not inherit the gap. */
+}
+
+.ans-et__request-send {
+	justify-self: start;
+}
+
+.ans-et__request-msg {
+	margin: 0;
+	font-size: .92rem;
+	line-height: 1.5;
+}
+
+.ans-et__request-msg.is-ok {
+	color: #1a7f37;
+	font-weight: 600;
+}
+
+.ans-et__request-msg.is-bad {
+	color: #b32d2e;
+}
+
+/* The honeypot. Off-screen rather than display:none — some bots skip
+   anything explicitly hidden, and every one of them fills this in. */
+.ans-et__hp {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}

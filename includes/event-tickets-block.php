@@ -179,13 +179,31 @@ function ans_et_tickets_for_event( $event_id ) {
 
 		$price = (float) $product->get_price();
 
+		/*
+		 * How many are left, and is this tier finished.
+		 *
+		 * ⚠️ is_purchasable() does NOT answer this. It checks price and post
+		 * status and returns TRUE for a stock-managed product sitting at zero —
+		 * measured on staging 2026-09-19, which is why the skip above does not
+		 * catch a sold-out tier and why this has to be computed explicitly.
+		 * Reading the callers of is_purchasable() and inferring the answer was
+		 * wrong; running it settled it.
+		 *
+		 * remaining is null when nothing is capped, which is the state every
+		 * concession product ships in. Null means "no limit", never "none left".
+		 */
+		$managed   = $product->get_manage_stock();
+		$remaining = $managed ? max( 0, (int) $product->get_stock_quantity() ) : null;
+
 		$rows[] = array(
-			'id'      => (int) $pid,
-			'tier'    => $tier,
-			'label'   => isset( $tiers[ $tier ] ) ? $tiers[ $tier ]['label'] : $product->get_name(),
-			'price'   => $price,
-			'price_h' => $price > 0 ? html_entity_decode( wp_strip_all_tags( wc_price( $price ) ), ENT_QUOTES, 'UTF-8' ) : 'Free',
-			'order'   => isset( $tiers[ $tier ] ) ? $tiers[ $tier ]['order'] : 99,
+			'id'        => (int) $pid,
+			'tier'      => $tier,
+			'label'     => isset( $tiers[ $tier ] ) ? $tiers[ $tier ]['label'] : $product->get_name(),
+			'price'     => $price,
+			'price_h'   => $price > 0 ? html_entity_decode( wp_strip_all_tags( wc_price( $price ) ), ENT_QUOTES, 'UTF-8' ) : 'Free',
+			'order'     => isset( $tiers[ $tier ] ) ? $tiers[ $tier ]['order'] : 99,
+			'remaining' => $remaining,
+			'sold_out'  => ( null !== $remaining && $remaining < 1 ),
 		);
 	}
 
@@ -230,7 +248,24 @@ function ans_et_performances( $event_ids ) {
 			'time'     => $stamp ? wp_date( get_option( 'time_format' ), $stamp ) : '',
 			'venue'    => (string) get_post_meta( $event_id, 'event_location', true ),
 			'tickets'  => $tickets,
+			/*
+			 * Two different states that used to be one.
+			 *
+			 * sold_out = there is nothing to sell here at all (every tier draft
+			 * or unpublished). That is "Not on sale" and predates this change.
+			 *
+			 * full = tiers exist and every one of them is exhausted. That is
+			 * "Sold out", and before 1.29.0 it was indistinguishable from a
+			 * healthy performance: the tier rows kept rendering at their normal
+			 * price and the buyer only discovered the truth at Add to cart.
+			 */
 			'sold_out' => empty( $tickets ),
+			'full'     => ! empty( $tickets ) && ! array_filter(
+				$tickets,
+				function ( $t ) {
+					return empty( $t['sold_out'] );
+				}
+			),
 		);
 	}
 
@@ -275,6 +310,9 @@ function ans_et_render( $atts = array() ) {
 		'performances' => $performances,
 		'cartUrl'      => $cart_url,
 		'restUrl'      => esc_url_raw( rest_url( 'wc/store/v1/' ) ),
+		// The sold-out escape hatch. See includes/ticket-requests.php.
+		'requestUrl'   => esc_url_raw( rest_url( 'ars-nova/v1/ticket-request' ) ),
+		'requestNonce' => wp_create_nonce( 'ans_tr' ),
 	);
 
 	$uid = 'ans-et-' . wp_generate_uuid4();
@@ -290,7 +328,7 @@ function ans_et_render( $atts = array() ) {
 			<?php foreach ( $performances as $p ) : ?>
 				<button
 					type="button"
-					class="ans-et__date<?php echo $p['sold_out'] ? ' is-unavailable' : ''; ?>"
+					class="ans-et__date<?php echo $p['sold_out'] ? ' is-unavailable' : ''; ?><?php echo $p['full'] ? ' is-full' : ''; ?>"
 					data-event="<?php echo esc_attr( $p['event'] ); ?>"
 					<?php echo $p['sold_out'] ? 'disabled aria-disabled="true"' : ''; ?>
 				>
@@ -304,6 +342,16 @@ function ans_et_render( $atts = array() ) {
 					<?php endif; ?>
 					<?php if ( $p['sold_out'] ) : ?>
 						<span class="ans-et__date-flag">Not on sale</span>
+					<?php elseif ( $p['full'] ) : ?>
+						<?php
+						/*
+						 * A full night stays CLICKABLE, unlike one that is not on
+						 * sale. Opening it is how the buyer reaches the special
+						 * request form — disabling the button here would remove
+						 * the only escape hatch from the sold-out state.
+						 */
+						?>
+						<span class="ans-et__date-flag">Sold out</span>
 					<?php endif; ?>
 				</button>
 			<?php endforeach; ?>
@@ -319,6 +367,44 @@ function ans_et_render( $atts = array() ) {
 			</div>
 
 			<p class="ans-et__err" role="alert" hidden></p>
+
+			<?php
+			/*
+			 * The escape hatch. Hidden until a tier on the chosen night is
+			 * exhausted. Markup lives here rather than being built in JS so it
+			 * is server-rendered, translatable and visible to anything that
+			 * reads the page without running scripts.
+			 */
+			?>
+			<div class="ans-et__request" hidden>
+				<p class="ans-et__request-lead"></p>
+				<button type="button" class="ans-et__request-open">Ask about a ticket</button>
+
+				<form class="ans-et__request-form" hidden>
+					<p class="ans-et__request-note">
+						Tell us who it is for and we will do our best. Someone from the box
+						office reads every one of these.
+					</p>
+					<label>Your name
+						<input type="text" name="name" autocomplete="name" required />
+					</label>
+					<label>Your email
+						<input type="email" name="email" autocomplete="email" required />
+					</label>
+					<label>How many
+						<input type="number" name="qty" value="1" min="1" max="4" />
+					</label>
+					<label>Anything we should know <span>(optional)</span>
+						<textarea name="message" rows="3" maxlength="500"></textarea>
+					</label>
+					<?php // Honeypot. Hidden from people, irresistible to bots. ?>
+					<div class="ans-et__hp" aria-hidden="true">
+						<label>Website<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+					</div>
+					<button type="submit" class="ans-et__request-send">Send request</button>
+					<p class="ans-et__request-msg" role="status"></p>
+				</form>
+			</div>
 		</div>
 
 		<script type="application/json" class="ans-et__data"><?php echo wp_json_encode( $payload ); ?></script>
