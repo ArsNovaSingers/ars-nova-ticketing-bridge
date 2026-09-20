@@ -2479,3 +2479,11 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/email-post-concert.php';
  * what is due right now must never be answered from cache.
  */
 require_once plugin_dir_path( __FILE__ ) . 'includes/rest-no-store.php';
+
+/**
+ * Special requests — the escape hatch beside a sold-out tier. Loaded after the
+ * event-tickets block because it answers the button that block renders, and it
+ * reaches ans_comp_issue() and ANSP_Free_Allocation only behind guards, so the
+ * picker keeps working with either plugin absent.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/ticket-requests.php';
