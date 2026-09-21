@@ -169,7 +169,12 @@ function ans_ost_ticket_forecast( $current, $target ) {
 	}
 	if ( in_array( $target, array( 'completed', 'processing' ), true ) ) {
 		if ( in_array( $current, array( 'cancelled', 'refunded' ), true ) ) {
-			return 'Tickets trashed by the earlier cancellation are NOT automatically restored. Check the returned ticket counts; if they are still trashed the order is payable but has no live codes.';
+			// MEASURED on staging 2026-09-21, order 7644: completed -> cancelled trashed both
+			// instances, and cancelled -> completed restored both to publish. The bridge does
+			// untrash. An earlier draft of this line asserted the opposite; it was wrong, and it
+			// was caught only because the route reports real counts either side. Trust those
+			// counts, not this sentence.
+			return 'The bridge restores the trashed ticket instances to publish - measured, not assumed. Confirm with the returned counts.';
 		}
 		return 'Tickets become scannable: only `completed` and `processing` pass the door check.';
 	}
