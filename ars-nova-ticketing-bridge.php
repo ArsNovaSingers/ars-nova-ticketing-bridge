@@ -2369,6 +2369,16 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/refund-voids-tickets.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/order-refunds.php';
 
 /**
+ * REST order-status endpoint. The connector could list orders and never change one, so
+ * cancelling a $0 test order on 2026-09-20 needed SSH and `wp eval`. Dry-run by default,
+ * confirm_production on Live, and it refuses `refunded` (that is order-refunds.php's job,
+ * through the gateway) and `trash` (which strands live ticket codes). Counts Tickera
+ * instances before and after, because a status change moves them and re-reading the
+ * order does not show it.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/order-status.php';
+
+/**
  * Clean up tickets left alive by refunds issued BEFORE v1.15.0. Those orders sit at
  * 'refunded' already, so the status-change hook will never fire for them, and the
  * resurrection guard cannot see them because they were never stamped.
