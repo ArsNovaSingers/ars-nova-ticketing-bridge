@@ -2379,6 +2379,14 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/order-refunds.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/order-status.php';
 
 /**
+ * REST move-ticket endpoint. Moving a patron from one performance to another (order 7977,
+ * 2026-09-22, Denver to Boulder) needed SSH and a hand-written wp eval-file touching four
+ * places. Dry-run by default, confirm_production on Live, refuses a price difference unless
+ * told, never moves money, keeps ticket codes, re-reads everything before reporting.
+ */
+require_once plugin_dir_path( __FILE__ ) . 'includes/order-move-ticket.php';
+
+/**
  * Clean up tickets left alive by refunds issued BEFORE v1.15.0. Those orders sit at
  * 'refunded' already, so the status-change hook will never fire for them, and the
  * resurrection guard cannot see them because they were never stamped.
