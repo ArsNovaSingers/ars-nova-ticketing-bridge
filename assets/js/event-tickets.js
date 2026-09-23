@@ -60,6 +60,15 @@
 		function totals() {
 			var count = 0, sum = 0;
 
+			// init() ends with paint() before any night is chosen, so current
+			// is still null here. Before 1.32.1 this threw on every ticket page
+			// load (uncaught TypeError in the console on all seven concert
+			// pages); clicks still worked only because the listeners were bound
+			// before that last line.
+			if ( ! current ) {
+				return { count: 0, sum: 0 };
+			}
+
 			current.tickets.forEach( function ( t ) {
 				var q = qty[ t.id ] || 0;
 				count += q;
