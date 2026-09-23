@@ -280,6 +280,45 @@ function ans_et_performances( $event_ids ) {
 }
 
 /**
+ * How long after a performance STARTS it stays on the ticket picker.
+ *
+ * Before 1.32.0 there was no cut-off at all: a performance stayed on the
+ * picker, clickable and buyable, for ever. Found 2026-09-23, when the Sept 12
+ * house concert was still offering a $60 ticket eleven days after the event.
+ *
+ * Two hours rather than zero so the Oct 10 style livestream can still be
+ * bought by someone who arrives late to it. Define it earlier (wp-config.php)
+ * to change it; the home page's next-event block has its own, longer window
+ * (ANS_NE_GRACE) because it is about what to show, not what to sell.
+ */
+if ( ! defined( 'ANS_ET_GRACE' ) ) {
+	define( 'ANS_ET_GRACE', 2 * HOUR_IN_SECONDS );
+}
+
+/**
+ * Drop performances that started more than ANS_ET_GRACE ago.
+ *
+ * A performance with no readable date is KEPT: hiding it would take a real
+ * ticket off sale because of a data problem, which fails silently. Showing it
+ * fails visibly.
+ *
+ * @param array $performances From ans_et_performances().
+ * @return array
+ */
+function ans_et_upcoming( $performances ) {
+	$now = time();
+
+	return array_values(
+		array_filter(
+			$performances,
+			function ( $p ) use ( $now ) {
+				return empty( $p['stamp'] ) || ( (int) $p['stamp'] + ANS_ET_GRACE ) > $now;
+			}
+		)
+	);
+}
+
+/**
  * Render.
  *
  * @param array $atts Attributes.
@@ -293,15 +332,27 @@ function ans_et_render( $atts = array() ) {
 			'heading'        => 'Choose your night',
 			'cart_url'       => '',
 			'empty_text'     => 'Tickets for this program are not on sale yet.',
+			'past_text'      => 'This concert has taken place. Thank you to everyone who joined us.',
 		),
 		is_array( $atts ) ? $atts : array(),
 		'ans_event_tickets'
 	);
 
-	$performances = ans_et_performances( ans_et_resolve_events( $atts ) );
+	$all_performances = ans_et_performances( ans_et_resolve_events( $atts ) );
+	$performances     = ans_et_upcoming( $all_performances );
 
 	if ( empty( $performances ) ) {
-		return '<div class="ans-et ans-et--empty"><p>' . esc_html( $atts['empty_text'] ) . '</p></div>';
+		/*
+		 * Two different empties. Nothing resolved at all means the program is
+		 * not on sale yet. Everything resolved but all of it has happened means
+		 * the concert is over, and saying "not on sale yet" about a concert
+		 * that already took place would be wrong.
+		 */
+		$text = empty( $all_performances ) ? $atts['empty_text'] : $atts['past_text'];
+
+		return '<div class="ans-et ans-et--empty' . ( empty( $all_performances ) ? '' : ' ans-et--past' ) . '">'
+			. ( $atts['heading'] ? '<h2 class="ans-et__heading">' . esc_html( $atts['heading'] ) . '</h2>' : '' )
+			. '<p>' . esc_html( $text ) . '</p></div>';
 	}
 
 	$cart_url = $atts['cart_url'] ? $atts['cart_url'] : ( function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '/cart/' );
